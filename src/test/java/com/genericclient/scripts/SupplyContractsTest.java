@@ -1,0 +1,71 @@
+package com.genericclient.scripts;
+
+import static org.junit.Assert.*;
+import com.genericclient.scripts.shared.Supplies;
+import com.genericclient.scripts.shared.Supply;
+import com.genericclient.scripts.shared.WorkflowScript;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import org.junit.Test;
+
+public class SupplyContractsTest
+{
+    @Test public void purchasesOnlyAfterTheExchangeWindowOpensAndPreservesTheReserve()
+    {
+        CatalogEnvironment game = new CatalogEnvironment(new WorkflowScript()
+        {
+            @Override protected Object runWorkflow()
+            {
+                Supplies.ensure(List.of(new Supply(536,"Dragon bones",2,3000)),true);
+                return Map.of("supplied",Supplies.owned(536));
+            }
+        },Map.of())
+        {
+            private int opening;
+            private boolean exchangeOpen;
+            @Override public Object read(String subject, Map<String,Object> query)
+            {
+                if (subject.equals("npcs"))
+                {
+                    List<Object> rows=new ArrayList<>((List<?>)super.read(subject,query));
+                    rows.add(Map.of("identity",3L,"id",2148,"index",2,"name","Grand Exchange Clerk",
+                        "world",Map.of("x",3165,"y",3491,"plane",0),"actions",List.of("Exchange")));
+                    return rows;
+                }
+                if (subject.equals("widgets")) return exchangeOpen ? List.of(Map.of("id",30474240,"index",-1,"visible",true)) : List.of();
+                return super.read(subject,query);
+            }
+            @Override public void sleep(long millis)
+            {
+                super.sleep(millis);
+                if (opening > 0 && --opening == 0) exchangeOpen=true;
+            }
+            @Override public Map<String,Object> execute(String type, Map<String,Object> arguments, long timeout)
+            {
+                if (type.equals("npc.interact") && arguments.get("action").equals("Exchange"))
+                {
+                    opening=3;
+                    return Map.of("status","dispatched");
+                }
+                if (type.equals("ge.buy"))
+                {
+                    assertTrue("The purchase must wait for visible exchange state",exchangeOpen);
+                    assertEquals(2,arguments.get("quantity"));
+                    assertEquals(3000,arguments.get("maximum_unit_price"));
+                    assertEquals(5_000_000L,arguments.get("minimum_cash_reserve"));
+                    inventory.remove(995);
+                    bank.put(536,2);
+                    return Map.of("status","complete");
+                }
+                if (type.equals("ui.close")) { exchangeOpen=false; return Map.of("status","complete"); }
+                return super.execute(type,arguments,timeout);
+            }
+        };
+        game.bank.put(995,5_006_000);
+        game.run();
+        assertEquals(Map.of("supplied",2),game.result);
+        assertEquals(5_000_000,(int)game.bank.get(995));
+        assertFalse(game.inventory.containsKey(995));
+    }
+}

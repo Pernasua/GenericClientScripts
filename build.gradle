@@ -1,0 +1,86 @@
+plugins {
+    id 'java'
+    id 'jacoco'
+    id 'pmd'
+    id 'info.solidsoft.pitest' version '1.19.0'
+}
+
+repositories { mavenCentral() }
+
+def clientDirectory = providers.gradleProperty('genericClientDir').getOrElse('../GenericClient')
+def suppliedSdk = providers.gradleProperty('scriptApiJar')
+def sdk = suppliedSdk.isPresent() ? file(suppliedSdk.get()) : file("${clientDirectory}/build/libs/GenericClient-script-api.jar")
+
+tasks.register('buildSdk', Exec) {
+    onlyIf { !suppliedSdk.isPresent() }
+    workingDir file(clientDirectory)
+    commandLine System.getProperty('os.name').startsWith('Windows') ? 'gradlew.bat' : './gradlew', 'sdkJar', '--console=plain'
+}
+
+dependencies {
+    compileOnly files(sdk)
+    testImplementation files(sdk)
+    testImplementation 'junit:junit:4.12'
+}
+
+sourceSets {
+    routeAudit {
+        compileClasspath += sourceSets.main.output + files(sdk)
+        runtimeClasspath += output + compileClasspath
+    }
+}
+
+tasks.named('compileJava') { dependsOn 'buildSdk' }
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release.set(11)
+    options.compilerArgs.addAll(['-Xlint:deprecation', '-Xlint:unchecked'])
+}
+
+tasks.named('jar') { archiveFileName.set('GenericClientScripts.jar') }
+
+tasks.register('exportRoutes', JavaExec) {
+    group = 'verification'
+    description = 'Export the Java catalog journeys and declared caller starts.'
+    dependsOn 'classes', 'routeAuditClasses'
+    classpath = sourceSets.routeAudit.runtimeClasspath
+    mainClass = 'com.genericclient.scripts.quests.ExportRoutes'
+    args providers.gradleProperty('routeOutput').getOrElse(layout.buildDirectory.file('route-audit/routes.tsv').get().asFile.absolutePath)
+}
+
+jacoco { toolVersion = '0.8.12' }
+pmd {
+    consoleOutput = true
+    toolVersion = '7.25.0'
+    ruleSets = []
+    ruleSetFiles = files("${clientDirectory}/config/pmd/ruleset.xml")
+}
+pitest {
+    targetClasses = providers.gradleProperty('pitestTargetClasses')
+        .map { value -> value.split(',') as List }
+        .getOrElse(['com.genericclient.scripts.*'])
+    targetTests = providers.gradleProperty('pitestTargetTests')
+        .map { value -> value.split(',') as List }
+        .getOrElse(['com.genericclient.scripts.*'])
+    threads = 4
+    outputFormats = ['HTML', 'XML']
+    timestampedReports = false
+    timeoutConstInMillis = 10_000
+    timeoutFactor = 2.0
+}
+tasks.named('test') {
+    systemProperty 'java.awt.headless', 'true'
+    finalizedBy tasks.named('jacocoTestReport')
+}
+tasks.named('jacocoTestReport') {
+    reports {
+        xml.required = true
+        html.required = true
+    }
+}
+tasks.withType(Pmd).configureEach {
+    reports {
+        xml.required = true
+        html.required = true
+    }
+}

@@ -2,4 +2,6 @@
 *.swp
 *~
 __pycache__/
+.gradle/
+build/
 /*-transcript.txt
