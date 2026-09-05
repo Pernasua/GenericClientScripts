@@ -44,7 +44,6 @@ local function open_panel()
       within = 3,
       run = true,
     },
-    breaks = true,
     timeout = { game_ticks = 120 },
   }
   if reached.status ~= "arrived" then return reached end
@@ -68,7 +67,6 @@ local function open_panel()
       world = panel.world,
       within = 10,
     },
-    breaks = true,
     timeout = { game_ticks = 40 },
   }
   if operated.status ~= "dispatched" then return operated end
@@ -98,7 +96,6 @@ local function solve()
         widget_id = puzzle.widget_id,
         widget_index = position,
       },
-      breaks = true,
       timeout = { game_ticks = 30 },
     }
     if clicked.status ~= "dispatched" then

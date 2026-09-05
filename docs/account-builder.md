@@ -223,6 +223,16 @@ A later exact-target run completed Magic 30 at 13,386 XP and Hitpoints 27 at
 returned a terminal target receipt rather than stopping on an approximate
 level observation.
 
+On 2026-09-03 the safe jail stage reached Magic 43 at 50,645 XP. The supplied
+Magic-guide transcripts make the next bracket conditional: Superheat Iron is a
+strong 43-50 route only with the game's level-15 Smithing requirement. A live
+attempt at Smithing 1 produced the exact rejection message and consumed no ore,
+nature rune, or Magic XP, so AIO Magic now hard-gates that branch. Auto instead
+uses the guides' no-prerequisite Low Alchemy route on stackable adamant arrows.
+Its first 21 live casts raised Magic to 51,296 XP, consuming one nature rune and
+arrow and returning 32 coins per verified 31-XP cast. The already purchased 957
+iron ore remain banked for later use rather than being discarded or resold.
+
 Tree Gnome Village completed through its modular Quest Runner, including maze
 navigation, Count Check interruption, logout/relogin break recovery, the orb
 sequence, and the Khazard Warlord safespot. Fight Arena then completed through

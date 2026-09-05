@@ -1,4 +1,8 @@
 local config = gc.require("tree_gnome_config")
+local equipment_actions = gc.require("shared_equipment")
+local item_queries = gc.require("shared_items")
+local movement = gc.require("shared_movement")
+local wait = gc.require("shared_wait")
 local interact = gc.require("tree_gnome_interactions")
 local navigation = gc.require("tree_gnome_navigation")
 
@@ -24,7 +28,7 @@ local function drain_continue_dialogue()
     if dialogue.type ~= "continue" then return true end
     local continued = gc.await {
       action = { type = "dialogue.continue" },
-      breaks = false,
+      policy = { breaks = false, cursor_release = "none", fidget = "none" },
       timeout = { game_ticks = 20 },
     }
     if continued.status ~= "dispatched" then return false end
@@ -33,33 +37,17 @@ local function drain_continue_dialogue()
   return gc.read("dialogue").type ~= "continue"
 end
 
-local function equip_staff()
-  if interact.quantity(gc.read("equipment"), config.items.staff_of_air) > 0 then return true end
-  if interact.quantity(gc.read("inventory"), config.items.staff_of_air) == 0 then
-    return nil, { status = "staff_missing" }
-  end
-  local equipped = gc.await {
-    action = { type = "item.interact", id = config.items.staff_of_air, action = "Wield" },
-    breaks = false,
-    timeout = { game_ticks = 20 },
-  }
-  if equipped.status ~= "dispatched" then
-    return nil, { status = "staff_equip_failed", receipt = equipped }
-  end
-  if not interact.wait_for(function()
-    return interact.quantity(gc.read("equipment"), config.items.staff_of_air) > 0
-  end, 10) then
-    return nil, { status = "staff_equip_unverified", receipt = equipped }
-  end
-  return true
-end
-
 local function configure()
-  local equipped, failure = equip_staff()
-  if not equipped then return nil, failure end
+  local equipped = equipment_actions.equip(
+    config.items.staff_of_air,
+    "Wield",
+    { timeout_ticks = 20, verify_ticks = 10 })
+  if equipped.status ~= "complete" and equipped.status ~= "unchanged" then
+    return nil, equipped
+  end
   local autocast = gc.await {
     action = { type = "combat.set_autocast", spell = "Earth Bolt" },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
     timeout = { game_ticks = 30 },
   }
   if autocast.status ~= "set" and autocast.status ~= "unchanged" then
@@ -73,7 +61,7 @@ local function configure()
       continue_after_consumable = true,
       allow_overheal = false,
     },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
   }
   if safety.status ~= "complete" then
     return nil, { status = "warlord_safety_failed", receipt = safety }
@@ -102,7 +90,7 @@ local function start_fight()
         action = "Talk-to",
         within = 20,
       },
-      breaks = false,
+      policy = { breaks = false, cursor_release = "none", fidget = "none" },
       timeout = { game_ticks = 40 },
     }
     receipts[#receipts + 1] = clicked
@@ -132,7 +120,7 @@ local function start_fight()
           closed_ticks = 0
           local continued = gc.await {
             action = { type = "dialogue.continue" },
-            breaks = false,
+            policy = { breaks = false, cursor_release = "none", fidget = "none" },
             timeout = { game_ticks = 20 },
           }
           receipts[#receipts + 1] = continued
@@ -184,7 +172,7 @@ local function attack()
       action = "Attack",
       within = 20,
     },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
     timeout = { game_ticks = 40 },
   }
   if receipt.status ~= "dispatched" then
@@ -207,7 +195,10 @@ local function position_safespot()
   local target = npc(config.npcs.warlord_combat, 20)
   if safespot_ready(target) then return true end
 
-  local dragged = interact.walk(config.points.warlord_drag, 1, false, 120)
+  local dragged = movement.walk(config.points.warlord_drag, 1, {
+    ticks = 120,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
+  })
   if dragged.status ~= "arrived" then
     return nil, { status = "warlord_drag_failed", receipt = dragged }
   end
@@ -224,7 +215,10 @@ local function position_safespot()
     return nil, { status = "warlord_pin_unverified", target = target }
   end
 
-  local cast = interact.walk(config.points.warlord_cast, 1, false, 80)
+  local cast = movement.walk(config.points.warlord_cast, 1, {
+    ticks = 80,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
+  })
   if cast.status ~= "arrived" then
     return nil, { status = "warlord_cast_tile_failed", receipt = cast }
   end
@@ -305,14 +299,17 @@ local function take_orbs()
   local drop = orbs_on_ground()
   if not drop then return { status = "rejected", result = "orbs_not_observed" } end
 
-  local approached = interact.walk(drop.world, 2, false, 80)
+  local approached = movement.walk(drop.world, 2, {
+    ticks = 80,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
+  })
   if approached.status ~= "arrived" then
     return { status = "rejected", result = "orbs_approach_failed", receipt = approached }
   end
 
   local attempts = {}
   for _ = 1, 4 do
-    if interact.carried(config.items.remaining_orbs) > 0 then
+    if item_queries.carried_quantity(config.items.remaining_orbs) > 0 then
       return { status = "complete", result = "orbs_obtained", attempts = attempts }
     end
     drop = orbs_on_ground()
@@ -324,12 +321,12 @@ local function take_orbs()
         world = drop.world,
         within = 10,
       },
-      breaks = false,
+      policy = { breaks = false, cursor_release = "none", fidget = "none" },
       timeout = { game_ticks = 40 },
     }
     attempts[#attempts + 1] = taken
-    if taken.status == "dispatched" and interact.wait_for(function()
-      return interact.carried(config.items.remaining_orbs) > 0
+    if taken.status == "dispatched" and wait.until_true(function()
+      return item_queries.carried_quantity(config.items.remaining_orbs) > 0
     end, 20) then
       return {
         status = "complete",

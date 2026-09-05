@@ -10,7 +10,7 @@ local function run(target_level, restock)
   progress.begin(start.xp)
   if start.xp >= target_xp or start.level >= target_level then
     progress.show(target_level, target_xp, "Target already met")
-    gc.await { action = { type = "mouse.offscreen" }, breaks = false }
+    gc.await { action = { type = "mouse.offscreen" }, policy = { breaks = false, cursor_release = "none", fidget = "none" } }
     return { status = "already_complete", level = start.level, xp = start.xp }
   end
 

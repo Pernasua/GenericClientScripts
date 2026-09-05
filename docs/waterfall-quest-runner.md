@@ -1,9 +1,9 @@
 # Waterfall Quest Runner
 
-Status: implemented and live-proven end to end under
+Historical live completion was recorded under
 `quest-runner/waterfall/`, with separate preparation, navigation, tomb, and
 ritual modules. The final receipt reported normalized quest state `FINISHED`,
-raw varp 10, and the exact quest rewards on genericBoss.
+raw varp 10, and the exact quest rewards on genericBoss. The current catalog-driven transport migration has source and offline validation; fresh live acceptance is pending.
 
 ## Decision
 
@@ -150,7 +150,7 @@ Important action anchors are Almera `(2521,3495,0)`, raft
 `(2509,3493,0)` (live object anchor; Quest Helper's marker is one tile north),
 Hudon `(2511,3484,0)`, rock `(2512,3468,0)`, tree
 `(2512,3465,0)`, barrel `(2512,3463,0)`, tourist stairs
-`(2518,3430,0)`, bookcase `(2520,3427,1)`, gnome ladder
+`(2517,3429,0)`, bookcase `(2520,3427,1)`, gnome ladder
 `(2533,3155,0)`, gnome crate `(2548,9565,0)`, gate `(2515,9575,0)`,
 Golrie `(2514,9580,0)`, tombstone `(2559,3445,0)`, amulet chest
 `(2530,9844,0)`, coffin `(2542,9812,0)`, falls crate `(2589,9888,0)`,
@@ -159,21 +159,9 @@ chalice at `(2604,9911,0)`; the live scene exposed object 2014 at
 `(2603,9910,0)`. The runner discovers that exact-ID object at execution time
 instead of relying on either static marker.
 
-The Tree Gnome maze route encoded by Quest Helper is:
+The gnome-dungeon phase submits one journey to `(2533,9556,0)`, including the maze and quest-gated ladder. The raft, Tourist Centre stairs and ordinary dungeon/tomb exits also use destination journeys. Preferred item teleports stay in Lua, as do the rope crossings, tomb equipment rules and ritual decisions. The client owns transport IDs, input and observed landing verification; see [the transport evidence and boundaries](https://github.com/JarrettOneSource/GenericClient/blob/main/docs/navigation-transitions.md).
 
-```text
-(2505,3190) (2512,3190) (2512,3188) (2532,3188) (2532,3182)
-(2523,3181) (2523,3185) (2521,3185) (2520,3179) (2514,3179)
-(2514,3177) (2527,3177) (2527,3179) (2529,3179) (2529,3177)
-(2531,3177) (2531,3179) (2533,3179) (2533,3177) (2544,3177)
-(2544,3174) (2549,3174) (2549,3165) (2545,3165) (2545,3159)
-(2550,3159) (2550,3156) (2548,3156) (2548,3145) (2538,3145)
-(2538,3150) (2541,3150) (2541,3148) (2544,3148) (2544,3150)
-(2545,3150) (2545,3155) (2533,3155)
-```
-
-All points are plane 0. Preserve this as one quest-specific route hint; normal
-ground movement still belongs to the core walker. The six pillars deliberately
+The six pillars deliberately
 have no hard-coded coordinates in Quest Helper. Discover all nearby object ID
 2005 instances inside the pillar/end-room area, de-duplicate by WorldPoint, and
 require exactly six before starting the ritual.
@@ -340,44 +328,27 @@ so no low-HP override is needed or planned for this run.
   or a quest stage outside the documented groups is a diagnostic stop requiring
   a live snapshot, not an invitation to guess.
 
-## Minimal GenericClient capabilities
+## GenericClient interface
 
-This quest should add only the reusable primitives its phases need:
+The current runner uses scripting API 3. The client supplies these reusable
+surfaces; Lua retains the quest's varps, zones, phase order, supplies and ritual:
 
-1. `quest.state`: normalized RuneLite quest state plus selected raw varps and
-   varbits. The script supplies the IDs; the core reads them on the client
-   thread.
-2. `scene.objects`: nearby objects with gameval ID, name, WorldPoint, shape,
-   canvas/minimap visibility, and live actions. It must return every matching
-   pillar, not just the nearest object.
-3. `object.interact`: interact with a live object by ID, optional WorldPoint,
-   and semantic action text, then wait for a movement/zone/item/state
-   postcondition.
-4. `item.interact`, `equipment.interact`, and `item.use_on_object`: `Read`,
-   `Wear`, `Remove`, and selected-item-on-scene-object through the synthetic
-   client-only cursor.
-5. `dialogue`: inspect current Continue/choice widgets, continue, and choose an
-   exact visible option string. It must tolerate additional warning pages.
-6. `bank.loadout`: deposit all, withdraw exact quantities, equip/unequip, keep
-   a five-million-coin reserve, and verify the resulting allowlist before
-   closing the bank.
-7. `player.vitals`: current/max Hitpoints, run energy, run-enabled state,
-   interacting actor, animation, and movement destination. RuneLite 1.12.37
-   exposes these underlying client surfaces, including `getEnergy`, skill
-   levels, varps/varbits, item containers, NPCs, scene, and menu actions
-   ([Client API](https://github.com/runelite/runelite/blob/2624bcc4136cea1011bf1bb154581a4b16c7a3ca/runelite-api/src/main/java/net/runelite/api/Client.java)).
-8. `food.eat`: choose an approved carried food item and verify the HP increase
-   or item consumption.
-9. `critical_section`: execute a bounded group with behavior breaks disabled,
-   while preserving cooperative cancellation and safety monitoring.
-10. `wait.until`: wait on explicit game-tick postconditions with a timeout and
-    structured failure receipt. No quest phase should use wall-clock sleeps as
-    proof of success.
+| Work | Interface |
+| --- | --- |
+| Quest and access observations | `gc.read("quests")` and `gc.read("vars", query)` |
+| Scene targets and vitals | `gc.read("objects", query)`, `gc.read("npcs", query)`, `gc.read("player")` |
+| Navigation | `gc.walk.to` through `shared_movement`, with native supported transport entries |
+| Object and item input | `object.interact`, `item.interact`, `equipment.interact`, `item.use_on_object` |
+| Conversation | `gc.read("dialogue")`, `dialogue.continue`, `dialogue.choose` |
+| Supplies | `bank.loadout` for an observed inventory allowlist; `ge.buy` with the script's five-million-coin reserve |
+| Emergency handling | `safety.configure` with approved consumables/escape and independent forced-healing rules |
+| Short sequences | `gc.intent(name, fn)`; urgent one-off actions retain explicit policy fields |
+| Quest postconditions | Bounded Lua predicates over fresh reads after `gc.await { event = "game.tick" }` |
 
-Quest-specific facts remain in the standalone Lua script: varp/varbit IDs,
-zones, item/entity IDs, phase ordering, dialogue option, loadouts, and the
-pillar ritual. Entity discovery, menu dispatch, banking, dialogue, vitals,
-break suppression, and postcondition waits belong in the plugin core.
+An observed menu dispatch is not the quest postcondition. The runner checks
+movement, zone, inventory and quest state before advancing. The maintained
+[client action reference](https://github.com/JarrettOneSource/GenericClient/blob/main/docs/mcp-lua-control.md)
+defines each native receipt and input contract.
 
 ## Live acceptance
 

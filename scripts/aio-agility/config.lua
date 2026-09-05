@@ -1,38 +1,18 @@
-local function xp_for_level(level)
-  local points = 0
-  for current = 1, level - 1 do
-    points = points + math.floor(current + 300 * 2 ^ (current / 7))
-  end
-  return math.floor(points / 4)
-end
+local skills = gc.require("shared_skills")
 
 local target_xp = {}
 for _, level in ipairs({ 10, 20, 25 }) do
-  target_xp[tostring(level)] = xp_for_level(level)
+  target_xp[tostring(level)] = skills.xp_for_level(level)
 end
 
 return {
-  xp_for_level = xp_for_level,
+  xp_for_level = skills.xp_for_level,
   target_xp = target_xp,
   course = {
     id = "gnome_stronghold",
     label = "Gnome Stronghold",
     zone = { x1 = 2455, y1 = 3400, x2 = 2500, y2 = 3450 },
     arrival = { x = 2470, y = 3420, plane = 0 },
-    gate = { id = 190, world = { x = 2461, y = 3383, plane = 0 } },
-    route = {
-      { x = 2545, y = 3260, plane = 0 },
-      { x = 2580, y = 3260, plane = 0 },
-      { x = 2580, y = 3310, plane = 0 },
-      { x = 2580, y = 3355, plane = 0 },
-      { x = 2530, y = 3370, plane = 0 },
-      { x = 2480, y = 3375, plane = 0 },
-      { x = 2461, y = 3379, plane = 0 },
-    },
-    inside_route = {
-      { x = 2461, y = 3400, plane = 0 },
-      { x = 2470, y = 3420, plane = 0 },
-    },
     obstacles = {
       log = {
         label = "Log balance",

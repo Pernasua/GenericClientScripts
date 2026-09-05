@@ -1,6 +1,7 @@
 -- genericclient-interface: 2
 
 local shared_state = gc.require("shared_state")
+local item_queries = gc.require("shared_items")
 local preparation = gc.require("shared_preparation")
 local witch_config = gc.require("witch_config")
 local witch_state = gc.require("witch_state")
@@ -10,6 +11,7 @@ local witch_combat = gc.require("witch_combat")
 local witch_completion = gc.require("witch_completion")
 local waterfall_config = gc.require("waterfall_config")
 local waterfall_state = gc.require("waterfall_state")
+local behaviors = gc.require("shared_behaviors")
 local waterfall_quest = gc.require("waterfall_quest")
 local tree_gnome_config = gc.require("tree_gnome_config")
 local tree_gnome_state = gc.require("tree_gnome_state")
@@ -112,7 +114,7 @@ local function waterfall_checkpoint_rank(state, phase)
   if state.varp == 0 then return 0 end
   if state.varp <= 2 then return 1 end
   if waterfall_final_phases[phase] or
-    (shared_state.total_owned(state, 295) > 0 and shared_state.total_owned(state, 296) > 0) then
+    (item_queries.total_owned(state, 295) > 0 and item_queries.total_owned(state, 296) > 0) then
     return 4
   end
   if waterfall_tomb_phases[phase] then return 3 end
@@ -149,10 +151,11 @@ return {
       id = "scope",
       label = "Scope",
       type = "choice",
-      default = "checkpoint",
+      default = "complete",
       choices = {
-        { value = "checkpoint", label = "Next checkpoint" },
         { value = "complete", label = "Quest completion" },
+        { value = "checkpoint", label = "Next checkpoint" },
+        { value = "prison_cell", label = "Monkey Madness prison cell" },
       },
     },
   },
@@ -184,14 +187,11 @@ return {
       waterfall_checkpoint_rank(initial, initial_phase) or nil
     if initial_phase ~= "complete" and initial_phase ~= "strict_stats_block" and
       initial_phase ~= "strict_hitpoints_block" then
-      local retaliate = gc.await {
-        action = { type = "combat.set_auto_retaliate", enabled = false },
-        breaks = false,
-        timeout = { game_ticks = 20 },
+      local configured, behavior_failure = behaviors.configure {
+        auto_retaliate = true,
+        emergency_escape = true,
       }
-      if retaliate.status ~= "set" and retaliate.status ~= "unchanged" then
-        return { status = "auto_retaliate_failed", receipt = retaliate }
-      end
+      if not configured then return behavior_failure end
 
       local maximum_hitpoints = initial.player and initial.player.max_hitpoints or 10
       local threshold = math.max(4, math.floor(maximum_hitpoints * 0.25))
@@ -205,7 +205,7 @@ return {
           continue_after_consumable = true,
           allow_overheal = input.quest == "waterfall",
         },
-        breaks = false,
+        policy = { breaks = false, cursor_release = "none", fidget = "none" },
       }
       if safety.status ~= "complete" then
         return { status = "safety_guard_failed", receipt = safety }
@@ -233,14 +233,14 @@ return {
       gc.log("info", "quest-phase", { quest = input.quest, phase = phase, varp = state.varp })
 
       if phase == "complete" then
-        gc.await { action = { type = "safety.clear" }, breaks = false }
-        gc.await { action = { type = "mouse.offscreen" }, breaks = false }
+        gc.await { action = { type = "safety.clear" }, policy = { breaks = false, cursor_release = "none", fidget = "none" } }
+        gc.await { action = { type = "mouse.offscreen" }, policy = { breaks = false, cursor_release = "none", fidget = "none" } }
         return { status = "complete", quest = input.quest, varp = state.varp }
       end
       if input.quest == "waterfall" and input.scope == "checkpoint" and
         waterfall_checkpoints[phase] and
         waterfall_checkpoints[phase] > initial_waterfall_checkpoint then
-        gc.await { action = { type = "mouse.offscreen" }, breaks = false }
+        gc.await { action = { type = "mouse.offscreen" }, policy = { breaks = false, cursor_release = "none", fidget = "none" } }
         return { status = phase .. "_checkpoint", quest = input.quest, varp = state.varp }
       end
       if phase == "shed_ready_checkpoint" and input.scope == "complete" then
@@ -291,7 +291,8 @@ return {
       local receipt = phase == "garden_fountain" and witch_garden.execute() or
         input.quest == "witchs_house" and witch_quest.execute(phase) or
         waterfall_quest.execute(phase, input.restock)
-      if not receipt or (receipt.status ~= "dispatched" and receipt.status ~= "complete") then
+      if not receipt or (receipt.status ~= "dispatched" and receipt.status ~= "complete" and
+        receipt.status ~= "arrived") then
         gc.log("error", "quest-action-failed", { phase = phase, receipt = receipt })
         local failure = {
           status = "action_failed",
@@ -318,7 +319,7 @@ return {
         return failure
       end
       if input.quest == "waterfall" and waterfall_break_bypass_phases[next_phase] then
-        gc.phase("quest." .. input.quest .. "." .. next_phase, { breaks = false })
+        gc.phase("quest." .. input.quest .. "." .. next_phase, { policy = { breaks = false, cursor_release = "none", fidget = "none" } })
       else
         gc.phase("quest." .. input.quest .. "." .. next_phase)
       end

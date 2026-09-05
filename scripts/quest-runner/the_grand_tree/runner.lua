@@ -21,8 +21,8 @@ end
 local function terminal(status, state, receipt, preserve_safety)
   local safety_preserved = under_attack() or preserve_safety == true
   if not safety_preserved then
-    gc.await { action = { type = "safety.clear" }, breaks = false }
-    gc.await { action = { type = "mouse.offscreen" }, breaks = false }
+    gc.await { action = { type = "safety.clear" }, policy = { breaks = false, cursor_release = "none", fidget = "none" } }
+    gc.await { action = { type = "mouse.offscreen" }, policy = { breaks = false, cursor_release = "none", fidget = "none" } }
   end
   return {
     status = status,
@@ -59,7 +59,7 @@ local function run(input)
       continue_after_consumable = true,
       allow_overheal = false,
     },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
   }
   if safety.status ~= "complete" then
     return terminal("safety_guard_failed", initial, safety)

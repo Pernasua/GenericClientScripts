@@ -1,16 +1,7 @@
+local movement = gc.require("shared_movement")
 local config = gc.require("grand_tree_config")
-
-local function distance(a, b)
-  if not a or not b or a.plane ~= b.plane then return 99999 end
-  return math.max(math.abs(a.x - b.x), math.abs(a.y - b.y))
-end
-
-local function has_item(id)
-  for _, item in ipairs(gc.read("inventory").items or {}) do
-    if item.id == id and item.quantity > 0 then return true end
-  end
-  return false
-end
+local geometry = gc.require("shared_geometry")
+local item_queries = gc.require("shared_items")
 
 local function npc(ids, within)
   for _, id in ipairs(ids) do
@@ -23,20 +14,6 @@ local function npc(ids, within)
     if target then return target end
   end
   return nil
-end
-
-local function walk(destination, within)
-  gc.activity("travel")
-  return gc.await {
-    action = {
-      type = "walk.to",
-      destination = destination,
-      within = within or 4,
-      run = true,
-    },
-    breaks = true,
-    timeout = { game_ticks = 600 },
-  }
 end
 
 local function in_tunnel(world)
@@ -54,7 +31,7 @@ local function finish_dialogue(predicate, started_tick)
       closed_ticks = 0
       local continued = gc.await {
         action = { type = "dialogue.continue" },
-        breaks = false,
+        policy = { breaks = false, cursor_release = "none", fidget = "none" },
         timeout = { game_ticks = 20 },
       }
       if continued.status ~= "dispatched" then return nil, continued end
@@ -105,7 +82,6 @@ local function enter_tunnel()
       world = trapdoor.world,
       within = 16,
     },
-    breaks = true,
     timeout = { game_ticks = 40 },
   }
   if descended.status ~= "dispatched" then return nil, descended end
@@ -121,7 +97,8 @@ local function reach_king()
   if target then return target end
   local entered, failure = enter_tunnel()
   if not entered then return nil, failure end
-  local approached = walk(config.points.cave_king, 6)
+  gc.activity("travel")
+  local approached = movement.walk(config.points.cave_king, 6, { ticks = 600 })
   if approached.status ~= "arrived" then
     return nil, { status = "cave_king_approach_failed", receipt = approached }
   end
@@ -140,7 +117,7 @@ local function talk_to_king_after_demon()
   local started_tick = gc.read("runtime").game_tick
   local talked = gc.await {
     action = { type = "npc.interact", id = target.id, action = "Talk-to", within = 20 },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
     timeout = { game_ticks = 40 },
   }
   if talked.status ~= "dispatched" then return talked end
@@ -163,8 +140,9 @@ local function roots_in_scene()
 end
 
 local function search_root(root)
-  if distance(gc.read("player").world, root.world) > 12 then
-    local approached = walk(root.world, 6)
+  if geometry.distance(gc.read("player").world, root.world) > 12 then
+    gc.activity("travel")
+    local approached = movement.walk(root.world, 6, { ticks = 600 })
     if approached.status ~= "arrived" then return nil, approached end
   end
   local searched = gc.await {
@@ -175,7 +153,6 @@ local function search_root(root)
       world = root.world,
       within = 16,
     },
-    breaks = true,
     timeout = { game_ticks = 40 },
   }
   if searched.status ~= "dispatched" then return nil, searched end
@@ -185,19 +162,19 @@ local function search_root(root)
     if dialogue.type == "continue" then
       local continued = gc.await {
         action = { type = "dialogue.continue" },
-        breaks = false,
+        policy = { breaks = false, cursor_release = "none", fidget = "none" },
         timeout = { game_ticks = 20 },
       }
       if continued.status ~= "dispatched" then return nil, continued end
     end
-    if has_item(config.items.daconia_rock) then return true, searched end
+    if item_queries.inventory_quantity(config.items.daconia_rock) > 0 then return true, searched end
     if tick >= 4 and dialogue.type == "closed" then break end
   end
   return false, searched
 end
 
 local function find_daconia_rock()
-  if has_item(config.items.daconia_rock) then
+  if item_queries.inventory_quantity(config.items.daconia_rock) > 0 then
     return { status = "complete", result = "daconia_rock_already_carried" }
   end
   local entered, failure = enter_tunnel()
@@ -241,7 +218,7 @@ local function find_daconia_rock()
 end
 
 local function return_daconia_rock()
-  if not has_item(config.items.daconia_rock) then
+  if item_queries.inventory_quantity(config.items.daconia_rock) == 0 then
     return { status = "daconia_rock_not_carried" }
   end
   local target, failure = reach_king()
@@ -249,7 +226,7 @@ local function return_daconia_rock()
   local started_tick = gc.read("runtime").game_tick
   local talked = gc.await {
     action = { type = "npc.interact", id = target.id, action = "Talk-to", within = 20 },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
     timeout = { game_ticks = 40 },
   }
   if talked.status ~= "dispatched" then return talked end

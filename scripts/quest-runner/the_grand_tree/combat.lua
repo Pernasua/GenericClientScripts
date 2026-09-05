@@ -1,41 +1,18 @@
 local config = gc.require("grand_tree_config")
+local equipment_actions = gc.require("shared_equipment")
+local geometry = gc.require("shared_geometry")
 local preparation = gc.require("shared_preparation")
 local travel = gc.require("shared_travel")
-
-local function quantity(container, id)
-  local total = 0
-  for _, item in ipairs((container and container.items) or {}) do
-    if item.id == id then total = total + item.quantity end
-  end
-  return total
-end
-
-local function distance(a, b)
-  if not a or a.plane ~= b.plane then return 99999 end
-  return math.max(math.abs(a.x - b.x), math.abs(a.y - b.y))
-end
-
-local function equip_staff()
-  if quantity(gc.read("equipment"), config.combat.staff) > 0 then return true end
-  local equipped = gc.await {
-    action = { type = "item.interact", id = config.combat.staff, action = "Wield" },
-    breaks = false,
-    timeout = { game_ticks = 20 },
-  }
-  if equipped.status ~= "dispatched" then return nil, equipped end
-  for _ = 1, 15 do
-    gc.await { event = "game.tick" }
-    if quantity(gc.read("equipment"), config.combat.staff) > 0 then return true end
-  end
-  return nil, { status = "black_demon_staff_equip_unverified", receipt = equipped }
-end
 
 local function prepare(restock)
   local loaded, loadout_error = preparation.prepare_items(
     config.id, restock or "bank_only", config.loadout)
   if not loaded then return loadout_error end
-  local equipped, equip_error = equip_staff()
-  if not equipped then return equip_error end
+  local equipped = equipment_actions.equip(
+    config.combat.staff,
+    "Wield",
+    { timeout_ticks = 20, verify_ticks = 15 })
+  if equipped.status ~= "complete" and equipped.status ~= "unchanged" then return equipped end
   return { status = "complete", result = "black_demon_loadout_prepared" }
 end
 
@@ -53,7 +30,7 @@ local function drain_continue_dialogue()
     if dialogue.type ~= "continue" then return true end
     local continued = gc.await {
       action = { type = "dialogue.continue" },
-      breaks = false,
+      policy = { breaks = false, cursor_release = "none", fidget = "none" },
       timeout = { game_ticks = 20 },
     }
     if continued.status ~= "dispatched" then return false, continued end
@@ -90,14 +67,14 @@ local function descend_watchtower()
       world = trapdoor.world,
       within = 16,
     },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
     timeout = { game_ticks = 40 },
   }
   if descended.status ~= "dispatched" then return descended end
   for _ = 1, 40 do
     gc.await { event = "game.tick" }
     local current = gc.read("player").world
-    if current.plane ~= player.plane or distance(current, player) > 32 or
+    if current.plane ~= player.plane or geometry.distance(current, player) > 32 or
       gc.read("dialogue").type ~= "closed" or npc(config.npcs.black_demon, 30) then
       return { status = "complete", result = "demon_tunnel_reached", receipt = descended }
     end
@@ -106,11 +83,16 @@ local function descend_watchtower()
 end
 
 local function configure_fight()
-  local equipped, equip_error = equip_staff()
-  if not equipped then return nil, equip_error end
+  local equipped = equipment_actions.equip(
+    config.combat.staff,
+    "Wield",
+    { timeout_ticks = 20, verify_ticks = 15 })
+  if equipped.status ~= "complete" and equipped.status ~= "unchanged" then
+    return nil, equipped
+  end
   local autocast = gc.await {
     action = { type = "combat.set_autocast", spell = "Fire Strike" },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
     timeout = { game_ticks = 30 },
   }
   if autocast.status ~= "set" and autocast.status ~= "unchanged" then
@@ -126,7 +108,7 @@ local function configure_fight()
       continue_after_consumable = true,
       allow_overheal = true,
     },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
   }
   if safety.status ~= "complete" then
     return nil, { status = "black_demon_safety_failed", receipt = safety }
@@ -151,7 +133,7 @@ local function position_safespot()
     local nearest = nil
     local nearest_distance = nil
     for _, candidate in ipairs(mapping.matches or {}) do
-      local candidate_distance = distance(player, candidate)
+      local candidate_distance = geometry.distance(player, candidate)
       if nearest_distance == nil or candidate_distance < nearest_distance then
         nearest = candidate
         nearest_distance = candidate_distance
@@ -160,7 +142,7 @@ local function position_safespot()
     if nearest then safespot = nearest end
 
     local walked = { status = "arrived", result = "already_on_safespot" }
-    if distance(player, safespot) > 0 then
+    if geometry.distance(player, safespot) > 0 then
       walked = gc.await {
         action = {
           type = "walk.to",
@@ -168,7 +150,7 @@ local function position_safespot()
           within = 0,
           run = true,
         },
-        breaks = false,
+        policy = { breaks = false, cursor_release = "none", fidget = "none" },
         timeout = { game_ticks = 180 },
       }
     end
@@ -193,7 +175,7 @@ local function attack()
   if not target then return nil, { status = "black_demon_not_observed" } end
   local attacked = gc.await {
     action = { type = "npc.interact", id = target.id, action = "Attack", within = 24 },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
     timeout = { game_ticks = 40 },
   }
   if attacked.status ~= "dispatched" then
@@ -223,7 +205,10 @@ local function fight()
     if not travel.has_dueling_ring() then
       return { status = "black_demon_respawn_transport_missing" }
     end
-    local reset = travel.teleport_to_castle_wars(false)
+    local reset = travel.teleport_to_castle_wars({
+      policy = { breaks = false, cursor_release = "none", fidget = "none" },
+      keyboard = true,
+    })
     if reset.status ~= "complete" then
       return { status = "black_demon_respawn_reset_failed", receipt = reset }
     end

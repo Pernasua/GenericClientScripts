@@ -1,3 +1,5 @@
+local failure = gc.require("shared_failure")
+
 local INVITATION_NPC_ID = 6753
 local MIME_NPC_ID = 321
 local ACCEPT_SHOW = "Yeah, I'd love to do a mime show."
@@ -14,13 +16,6 @@ local EMOTES = {
   [1131] = { name = "Glass box", widget = 12320773 },
 }
 
-local function fail(status, details)
-  local value = details or {}
-  value.status = status
-  gc.log("error", "mime-failed", value)
-  error(status, 0)
-end
-
 local function mime()
   return gc.read("npcs", { id = MIME_NPC_ID, within = 20, limit = 1 })[1]
 end
@@ -34,58 +29,59 @@ local function choose_show(dialogue)
     if option.text == ACCEPT_SHOW then
       return gc.await {
         action = { type = "dialogue.choose", text = option.text },
-        breaks = false,
         timeout = { game_ticks = 20 },
       }
     end
   end
-  fail("unexpected_invitation_choice", { dialogue = dialogue })
+  failure.raise("mime-failed", "unexpected_invitation_choice", { dialogue = dialogue })
 end
 
 local function enter_show()
   if mime() then return end
 
-  local talked = gc.await {
-    action = {
-      type = "npc.interact",
-      id = INVITATION_NPC_ID,
-      action = "Talk-to",
-      within = 12,
-    },
-    breaks = false,
-    timeout = { game_ticks = 30 },
-  }
-  if talked.status ~= "dispatched" then
-    fail("invitation_talk_failed", { receipt = talked })
-  end
-
-  for _ = 1, 100 do
-    if mime() then return end
-    local dialogue = gc.read("dialogue")
-    if dialogue.type == "continue" then
-      local continued = gc.await {
-        action = { type = "dialogue.continue" },
-        breaks = false,
-        timeout = { game_ticks = 20 },
-      }
-      if continued.status ~= "dispatched" then
-        fail("invitation_continue_failed", { receipt = continued })
-      end
-    elseif dialogue.type == "choice" then
-      local chosen = choose_show(dialogue)
-      if chosen.status ~= "dispatched" then
-        fail("invitation_choice_failed", { receipt = chosen })
-      end
-    else
-      gc.await { event = "game.tick" }
+  return gc.intent("mime.accept_show", function()
+    local talked = gc.await {
+      action = {
+        type = "npc.interact",
+        id = INVITATION_NPC_ID,
+        action = "Talk-to",
+        within = 12,
+      },
+      timeout = { game_ticks = 30 },
+    }
+    if talked.status ~= "dispatched" then
+      failure.raise("mime-failed", "invitation_talk_failed", { receipt = talked })
     end
-  end
 
-  fail("show_not_reached", {
-    event = gc.read("random_event"),
-    player = gc.read("player"),
-    dialogue = gc.read("dialogue"),
-  })
+    for _ = 1, 100 do
+      if mime() then return end
+      local dialogue = gc.read("dialogue")
+      if dialogue.type == "continue" then
+        local continued = gc.await {
+          action = { type = "dialogue.continue" },
+          timeout = { game_ticks = 20 },
+        }
+        if continued.status ~= "dispatched" and
+          continued.result ~= "dialogue_is_choice" and
+          continued.result ~= "dialogue_continue_not_visible" then
+          failure.raise("mime-failed", "invitation_continue_failed", { receipt = continued })
+        end
+      elseif dialogue.type == "choice" then
+        local chosen = choose_show(dialogue)
+        if chosen.status ~= "dispatched" then
+          failure.raise("mime-failed", "invitation_choice_failed", { receipt = chosen })
+        end
+      else
+        gc.await { event = "game.tick" }
+      end
+    end
+
+    failure.raise("mime-failed", "show_not_reached", {
+      event = gc.read("random_event"),
+      player = gc.read("player"),
+      dialogue = gc.read("dialogue"),
+    })
+  end)
 end
 
 local function reward_message(since_tick)
@@ -125,11 +121,11 @@ local function perform_show(started_tick)
       elseif panel_open and answer then
         local receipt = gc.await {
           action = { type = "ui.click", widget_id = answer.widget },
-          breaks = false,
+          policy = { breaks = false, cursor_release = "none", fidget = "none" },
           timeout = { game_ticks = 20 },
         }
         if receipt.status ~= "dispatched" then
-          fail("emote_click_failed", { answer = answer.name, receipt = receipt })
+          failure.raise("mime-failed", "emote_click_failed", { answer = answer.name, receipt = receipt })
         end
         rounds[#rounds + 1] = answer.name
         waiting_for_panel_to_close = true
@@ -139,7 +135,7 @@ local function perform_show(started_tick)
     end
   end
 
-  fail("show_completion_not_observed", {
+  failure.raise("mime-failed", "show_completion_not_observed", {
     rounds = rounds,
     player = gc.read("player"),
     mime = mime(),

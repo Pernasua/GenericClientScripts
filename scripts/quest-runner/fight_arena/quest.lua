@@ -1,12 +1,12 @@
 local config = gc.require("fight_arena_config")
+local geometry = gc.require("shared_geometry")
+local item_queries = gc.require("shared_items")
+local movement = gc.require("shared_movement")
+local wait = gc.require("shared_wait")
 local interact = gc.require("fight_arena_interactions")
 local navigation = gc.require("fight_arena_navigation")
 local combat = gc.require("fight_arena_combat")
-
-local function in_zone(world, zone)
-  return world and world.plane == zone.plane and world.x >= zone.x1 and world.x <= zone.x2 and
-    world.y >= zone.y1 and world.y <= zone.y2
-end
+local urgent_policy = { breaks = false, cursor_release = "none", fidget = "none" }
 
 local function accept_quest()
   local reached = navigation.reach_lady()
@@ -15,8 +15,7 @@ local function accept_quest()
     config.npcs.lady_servil,
     config.points.lady_servil,
     function() return interact.varp() > 0 end,
-    { "Yes." },
-    true)
+    { "Yes." })
 end
 
 local function talk_head_guard()
@@ -25,8 +24,7 @@ local function talk_head_guard()
     config.npcs.head_guard,
     config.points.head_guard,
     function() return interact.varp() ~= before end,
-    {},
-    true)
+    {})
 end
 
 local function buy_khali_brew()
@@ -35,9 +33,8 @@ local function buy_khali_brew()
   return interact.talk(
     config.npcs.barman,
     config.points.bar,
-    function() return interact.carried(config.items.khali_brew) > 0 end,
-    { "I'd like a Khali Brew please." },
-    true)
+    function() return item_queries.carried_quantity(config.items.khali_brew) > 0 end,
+    { "I'd like a Khali Brew please." })
 end
 
 local function give_khali_brew()
@@ -46,17 +43,15 @@ local function give_khali_brew()
     config.npcs.head_guard,
     config.points.head_guard,
     function() return interact.varp() ~= before end,
-    {},
-    true)
+    {})
 end
 
 local function get_cell_keys()
   return interact.talk(
     config.npcs.head_guard,
     config.points.head_guard,
-    function() return interact.carried(config.items.cell_keys) > 0 end,
-    {},
-    true)
+    function() return item_queries.carried_quantity(config.items.cell_keys) > 0 end,
+    {})
 end
 
 local function free_sammy()
@@ -65,7 +60,7 @@ local function free_sammy()
     config.objects.sammy_door,
     config.points.sammy_door,
     function() return interact.varp() >= 6 end,
-    false,
+    urgent_policy,
     10)
 end
 
@@ -77,7 +72,7 @@ local function talk_sammy(targets)
     return false
   end
   if gc.read("player").world.x >= 10000 or gc.read("dialogue").type ~= "closed" then
-    local dialogue, failure = interact.finish_dialogue(target_ready, {}, false, 160)
+    local dialogue, failure = interact.finish_dialogue(target_ready, {}, urgent_policy, 160)
     if not dialogue then return failure end
     return { status = "complete", result = "arena_cutscene_complete", dialogue = dialogue }
   end
@@ -95,7 +90,7 @@ local function talk_sammy(targets)
     if talkable_sammy then break end
   end
   if not talkable_sammy then
-    local near = interact.approach(config.points.arena_reentry, 1, false)
+    local near = movement.approach(config.points.arena_reentry, 1, { policy = urgent_policy })
     if near.status ~= "arrived" then return near end
     gc.await { event = "game.tick" }
     local door = interact.object(config.objects.arena_door_one, "Open", 12)
@@ -114,11 +109,11 @@ local function talk_sammy(targets)
         world = door.world,
         within = 12,
       },
-      breaks = false,
+      policy = urgent_policy,
       timeout = { game_ticks = 40 },
     }
     if opened.status ~= "dispatched" then return opened end
-    local dialogue, failure = interact.finish_dialogue(target_ready, {}, false, 160)
+    local dialogue, failure = interact.finish_dialogue(target_ready, {}, urgent_policy, 160)
     if not dialogue then return failure end
     return {
       status = "complete",
@@ -132,7 +127,7 @@ local function talk_sammy(targets)
     config.points.sammy,
     target_ready,
     {},
-    false)
+    urgent_policy)
 end
 
 local function talk_general_khazard()
@@ -141,7 +136,7 @@ local function talk_general_khazard()
     local dialogue, failure = interact.finish_dialogue(
       function() return interact.varp() ~= before end,
       {},
-      false,
+      urgent_policy,
       160)
     if not dialogue then return failure end
     return { status = "complete", result = "general_khazard_cutscene_complete", dialogue = dialogue }
@@ -151,7 +146,7 @@ local function talk_general_khazard()
     config.points.sammy,
     function() return interact.varp() ~= before end,
     {},
-    false)
+    urgent_policy)
 end
 
 local function talk_hengrad()
@@ -159,11 +154,11 @@ local function talk_hengrad()
     config.npcs.hengrad,
     config.points.hengrad,
     function()
-      return not in_zone(gc.read("player").world, config.zones.cell) or
+      return not geometry.in_zone(gc.read("player").world, config.zones.cell) or
         interact.npc(config.npcs.scorpion, 24) ~= nil
     end,
     {},
-    false)
+    urgent_policy)
 end
 
 local function leave_arena()
@@ -172,7 +167,7 @@ local function leave_arena()
       local dialogue, failure = interact.finish_dialogue(
         function() return gc.read("dialogue").type == "closed" end,
         {},
-        false,
+        urgent_policy,
         160)
       if not dialogue then return failure end
     end
@@ -182,7 +177,7 @@ local function leave_arena()
       local mapping = gc.read("instance", { template = config.points.arena_exit })
       local destination = mapping.matches and mapping.matches[1]
       if destination then
-        local near = interact.walk(destination, 6, false, 120)
+        local near = movement.walk(destination, 6, { ticks = 120, policy = urgent_policy })
         if near.status ~= "arrived" then return near end
         gc.await { event = "game.tick" }
         door = gc.read("objects", { action = "Quick-escape", within = 24, limit = 3 })[1]
@@ -199,11 +194,11 @@ local function leave_arena()
         world = door.world,
         within = 12,
       },
-      breaks = false,
+      policy = urgent_policy,
       timeout = { game_ticks = 40 },
     }
     if escaped.status ~= "dispatched" then return escaped end
-    if not interact.wait_for(function()
+    if not wait.until_true(function()
       return gc.read("player").world.x < 10000
     end, 30) then
       return { status = "timed_out", result = "arena_quick_escape_unverified", receipt = escaped }
@@ -211,7 +206,7 @@ local function leave_arena()
     return { status = "complete", result = "arena_quick_escape_verified", receipt = escaped }
   end
 
-  local near = interact.approach(config.points.arena_exit, 2, false)
+  local near = movement.approach(config.points.arena_exit, 2, { policy = urgent_policy })
   if near.status ~= "arrived" then return near end
   local door = interact.object(config.objects.arena_door_two, "Open", 10)
   if not door then
@@ -229,14 +224,14 @@ local function leave_arena()
       world = door.world,
       within = 10,
     },
-    breaks = false,
+    policy = urgent_policy,
     timeout = { game_ticks = 40 },
   }
   if opened.status ~= "dispatched" then return opened end
   local dialogue, failure = interact.finish_dialogue(
-    function() return not in_zone(gc.read("player").world, config.zones.arena) end,
+    function() return not geometry.in_zone(gc.read("player").world, config.zones.arena) end,
     { "Yes." },
-    false,
+    urgent_policy,
     80)
   if not dialogue then return failure end
   return { status = "complete", result = "arena_exited", receipt = opened, dialogue = dialogue }
@@ -247,8 +242,7 @@ local function finish_quest()
     config.npcs.lady_servil,
     config.points.lady_servil,
     interact.quest_finished,
-    {},
-    true)
+    {})
 end
 
 local function execute(phase)

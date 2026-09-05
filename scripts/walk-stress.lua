@@ -8,7 +8,7 @@ return {
       { label = "Attempts", value = "0 / 3" },
     }
     gc.await { event = "game.tick" }
-    gc.phase("diagnostics.walk-stress", { breaks = false })
+    gc.phase("diagnostics.walk-stress", { policy = { breaks = false, cursor_release = "none", fidget = "none" } })
 
     for attempt = 1, 3 do
       gc.overlay {
@@ -22,7 +22,7 @@ return {
         timeout = {
           game_ticks = 8,
         },
-        breaks = false,
+        policy = { breaks = false, cursor_release = "none", fidget = "none" },
       }
 
       gc.log("info", "walk-attempt", {

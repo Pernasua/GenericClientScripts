@@ -1,12 +1,5 @@
+local item_queries = gc.require("shared_items")
 local travel = gc.require("shared_travel")
-
-local function quantity(id)
-  local total = 0
-  for _, item in ipairs(gc.read("inventory").items) do
-    if item.id == id then total = total + item.quantity end
-  end
-  return total
-end
 
 local function in_hostile_quest_area(world)
   return world and world.plane == 0 and world.x >= 2900 and world.x <= 2937 and
@@ -14,7 +7,7 @@ local function in_hostile_quest_area(world)
 end
 
 local function take_ball()
-  if quantity(2407) > 0 then return { status = "complete", result = "ball_already_carried" } end
+  if item_queries.inventory_quantity(2407) > 0 then return { status = "complete", result = "ball_already_carried" } end
   local take = gc.await {
     action = {
       type = "ground_item.take",
@@ -22,13 +15,13 @@ local function take_ball()
       world = { x = 2935, y = 3460, plane = 0 },
       within = 10,
     },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
     timeout = { game_ticks = 40 },
   }
   if take.status ~= "dispatched" then return { status = "ball_take_failed", receipt = take } end
   for _ = 1, 12 do
     gc.await { event = "game.tick" }
-    if quantity(2407) > 0 then return { status = "complete", result = "ball_obtained", receipt = take } end
+    if item_queries.inventory_quantity(2407) > 0 then return { status = "complete", result = "ball_obtained", receipt = take } end
   end
   return { status = "ball_take_unverified", receipt = take }
 end
@@ -41,13 +34,13 @@ local function return_to_boy()
       within = 3,
       run = true,
     },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
     timeout = { game_ticks = 900 },
   }
   if walked.status ~= "arrived" then return { status = "boy_travel_failed", receipt = walked } end
   local talked = gc.await {
     action = { type = "npc.interact", id = 3994, action = "Talk-to", within = 10 },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
     timeout = { game_ticks = 40 },
   }
   if talked.status ~= "dispatched" then return { status = "boy_talk_failed", receipt = talked } end
@@ -71,7 +64,7 @@ local function return_to_boy()
     if dialogue.type == "continue" then
       local receipt = gc.await {
         action = { type = "dialogue.continue" },
-        breaks = false,
+        policy = { breaks = false, cursor_release = "none", fidget = "none" },
         timeout = { game_ticks = 20 },
       }
       table.insert(continuations, receipt)
@@ -105,7 +98,7 @@ local function execute()
   if in_hostile_quest_area(gc.read("player").world) then
     teleport = travel.teleport_to_burthorpe()
     if teleport.status ~= "complete" then return teleport end
-    if quantity(2407) == 0 then
+    if item_queries.inventory_quantity(2407) == 0 then
       return { status = "ball_lost_during_teleport", teleport = teleport }
     end
   end
@@ -113,8 +106,8 @@ local function execute()
   completed.ball = ball
   completed.teleport = teleport
   if completed.status == "complete" then
-    gc.await { action = { type = "safety.clear" }, breaks = false }
-    gc.await { action = { type = "mouse.offscreen" }, breaks = false }
+    gc.await { action = { type = "safety.clear" }, policy = { breaks = false, cursor_release = "none", fidget = "none" } }
+    gc.await { action = { type = "mouse.offscreen" }, policy = { breaks = false, cursor_release = "none", fidget = "none" } }
   end
   return completed
 end

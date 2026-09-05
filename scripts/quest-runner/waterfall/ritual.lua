@@ -1,41 +1,15 @@
+local movement = gc.require("shared_movement")
 local config = gc.require("waterfall_config")
-
-local function in_zone(world, zone)
-  return world and world.plane == zone.plane and world.x >= zone.x1 and world.x <= zone.x2 and
-    world.y >= zone.y1 and world.y <= zone.y2
-end
-
-local function quantity(id, subject)
-  local total = 0
-  for _, item in ipairs(gc.read(subject or "inventory").items) do
-    if item.id == id then total = total + item.quantity end
-  end
-  return total
-end
-
-local function walk(world, within, ticks)
-  return gc.await {
-    action = {
-      type = "walk.to",
-      destination = world,
-      within = within or 3,
-      run = true,
-    },
-    breaks = false,
-    timeout = { game_ticks = ticks or 600 },
-  }
-end
-
-local function wait_for(predicate, ticks)
-  for _ = 1, ticks do
-    gc.await { event = "game.tick" }
-    if predicate() then return true end
-  end
-  return false
-end
+local equipment_actions = gc.require("shared_equipment")
+local geometry = gc.require("shared_geometry")
+local item_queries = gc.require("shared_items")
+local wait = gc.require("shared_wait")
 
 local function obtain_key()
-  local approach = walk(config.points.falls_crate, 3, 600)
+  local approach = movement.walk(config.points.falls_crate, 3, {
+    ticks = 600,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
+  })
   if approach.status ~= "arrived" then return approach end
   local searched = gc.await {
     action = {
@@ -45,22 +19,25 @@ local function obtain_key()
       world = config.points.falls_crate,
       within = 4,
     },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
     timeout = { game_ticks = 40 },
   }
   if searched.status ~= "dispatched" then return searched end
-  if not wait_for(function() return quantity(config.items.baxtorian_key) > 0 end, 20) then
+  if not wait.until_true(function() return item_queries.inventory_quantity(config.items.baxtorian_key) > 0 end, 20) then
     return { status = "timed_out", result = "baxtorian_key_unverified", receipt = searched }
   end
   return { status = "complete", result = "baxtorian_key_obtained", receipt = searched }
 end
 
 local function open_inner_door()
-  local staged = walk(config.points.inner_door_staging, 0, 600)
+  local staged = movement.walk(config.points.inner_door_staging, 0, {
+    ticks = 600,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
+  })
   if staged.status ~= "arrived" then
     return { status = "timed_out", result = "inner_door_staging_unverified", walk = staged }
   end
-  if in_zone(gc.read("player").world, config.zones.pillar_room) then
+  if geometry.in_zone(gc.read("player").world, config.zones.pillar_room) then
     return { status = "complete", result = "pillar_room_entered", walk = staged }
   end
   local closed = gc.read("objects", {
@@ -79,16 +56,19 @@ local function open_inner_door()
         world = closed[1].world,
         within = 8,
       },
-      breaks = false,
+      policy = { breaks = false, cursor_release = "none", fidget = "none" },
       timeout = { game_ticks = 40 },
     }
     if opened.status ~= "dispatched" then return opened end
     gc.await { event = "game.tick" }
   end
-  local crossed = walk({ x = 2566, y = 9903, plane = 0 }, 0, 180)
+  local crossed = movement.walk({ x = 2566, y = 9903, plane = 0 }, 0, {
+    ticks = 180,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
+  })
   local destination = gc.read("player").world
-  local pillar_room = in_zone(destination, config.zones.pillar_room)
-  local chalice_room = in_zone(destination, config.zones.chalice_room)
+  local pillar_room = geometry.in_zone(destination, config.zones.pillar_room)
+  local chalice_room = geometry.in_zone(destination, config.zones.chalice_room)
   if not pillar_room and not chalice_room then
     return {
       status = "timed_out",
@@ -113,18 +93,9 @@ local function open_inner_door()
 end
 
 local function remove_amulet()
-  local removed = gc.await {
-    action = { type = "equipment.interact", id = config.items.amulet, action = "Remove" },
-    breaks = false,
-    timeout = { game_ticks = 40 },
-  }
-  if removed.status ~= "dispatched" then return removed end
-  if not wait_for(function()
-    return quantity(config.items.amulet) > 0 and quantity(config.items.amulet, "equipment") == 0
-  end, 12) then
-    return { status = "timed_out", result = "glarial_amulet_remove_unverified", receipt = removed }
-  end
-  return { status = "complete", result = "glarial_amulet_removed", receipt = removed }
+  return equipment_actions.unequip(
+    config.items.amulet,
+    { timeout_ticks = 40, verify_ticks = 12 })
 end
 
 local function pillars()
@@ -153,7 +124,7 @@ local function already_placed(since_tick)
 end
 
 local function place_rune(item_id, pillar)
-  local before_quantity = quantity(item_id)
+  local before_quantity = item_queries.inventory_quantity(item_id)
   if before_quantity < 1 then
     return nil, { status = "ritual_rune_missing", item_id = item_id, pillar = pillar.world }
   end
@@ -166,7 +137,7 @@ local function place_rune(item_id, pillar)
       world = pillar.world,
       within = 4,
     },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
     timeout = { game_ticks = 40 },
   }
   if placed.status ~= "dispatched" then
@@ -174,7 +145,7 @@ local function place_rune(item_id, pillar)
   end
   for _ = 1, 8 do
     gc.await { event = "game.tick" }
-    if quantity(item_id) < before_quantity then
+    if item_queries.inventory_quantity(item_id) < before_quantity then
       return { status = "complete", result = "rune_consumed", receipt = placed }
     end
     local existing, message = already_placed(since_tick)
@@ -199,7 +170,10 @@ local function charge_pillars()
   local receipts = {}
   local runes = { config.items.air_rune, config.items.water_rune, config.items.earth_rune }
   for pillar_index, pillar in ipairs(observed) do
-    local approach = walk(pillar.world, 3, 120)
+    local approach = movement.walk(pillar.world, 3, {
+      ticks = 120,
+      policy = { breaks = false, cursor_release = "none", fidget = "none" },
+    })
     if approach.status ~= "arrived" then
       return {
         status = "pillar_approach_failed",
@@ -223,7 +197,10 @@ local function charge_pillars()
       })
     end
   end
-  local approach = walk(config.points.statue, 3, 600)
+  local approach = movement.walk(config.points.statue, 3, {
+    ticks = 600,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
+  })
   if approach.status ~= "arrived" then
     return { status = "statue_approach_failed", receipt = approach, ritual = receipts }
   end
@@ -235,14 +212,14 @@ local function charge_pillars()
       world = config.points.statue,
       within = 4,
     },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
     timeout = { game_ticks = 40 },
   }
   if raised.status ~= "dispatched" then
     return { status = "statue_amulet_failed", receipt = raised, ritual = receipts }
   end
-  if not wait_for(function()
-    return in_zone(gc.read("player").world, config.zones.chalice_room)
+  if not wait.until_true(function()
+    return geometry.in_zone(gc.read("player").world, config.zones.chalice_room)
   end, 40) then
     return {
       status = "chalice_room_unverified",
@@ -263,7 +240,7 @@ local function close_continue_dialogues(limit)
     end
     local continued = gc.await {
       action = { type = "dialogue.continue" },
-      breaks = false,
+      policy = { breaks = false, cursor_release = "none", fidget = "none" },
       timeout = { game_ticks = 20 },
     }
     if continued.status ~= "dispatched" then
@@ -275,7 +252,7 @@ local function close_continue_dialogues(limit)
 end
 
 local function finish_quest()
-  if quantity(config.items.empty_urn) > 0 then
+  if item_queries.inventory_quantity(config.items.empty_urn) > 0 then
     return { status = "empty_urn_detected", item_id = config.items.empty_urn }
   end
   local dialogue_closed, dialogue_failure = close_continue_dialogues(6)
@@ -292,7 +269,10 @@ local function finish_quest()
     }
   end
   local chalice = chalices[1]
-  local approach = walk(chalice.world, 3, 120)
+  local approach = movement.walk(chalice.world, 3, {
+    ticks = 120,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
+  })
   if approach.status ~= "arrived" then return approach end
   local finished = gc.await {
     action = {
@@ -302,7 +282,7 @@ local function finish_quest()
       world = chalice.world,
       within = 4,
     },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
     timeout = { game_ticks = 40 },
   }
   if finished.status ~= "dispatched" then return finished end
@@ -315,7 +295,7 @@ local function finish_quest()
     if dialogue.type == "continue" then
       local continued = gc.await {
         action = { type = "dialogue.continue" },
-        breaks = false,
+        policy = { breaks = false, cursor_release = "none", fidget = "none" },
         timeout = { game_ticks = 20 },
       }
       if continued.status ~= "dispatched" then

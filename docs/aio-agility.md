@@ -34,8 +34,8 @@ awarded 111 integer XP for a complete lap:
 | North net | 23135 | `Climb-over` | `(2487,3428,0)` |
 | Pipe | 23139 | `Squeeze-through` | `(2487,3437,0)` |
 
-Each click runs as `skilling`: ordinary breaks and independent cursor release
-are eligible. Level-up dialogue is drained without breaks, then the script
+Each click runs as `skilling`: ordinary breaks and cursor release during a break
+are eligible. Level-up dialogue is drained without discretionary behavior, then the script
 waits for the obstacle animation to settle before resolving the next state.
 
 ## Live receipt

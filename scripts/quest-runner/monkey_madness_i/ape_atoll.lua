@@ -1,12 +1,8 @@
 local config = gc.require("monkey_madness_config")
+local geometry = gc.require("shared_geometry")
+local movement = gc.require("shared_movement")
 local navigation = gc.require("monkey_madness_navigation")
 local preparation = gc.require("monkey_madness_preparation")
-
-local function in_zone(world, zone)
-  return world and world.plane == zone.plane and
-    world.x >= zone.x1 and world.x <= zone.x2 and
-    world.y >= zone.y1 and world.y <= zone.y2
-end
 
 local function npc(ids, within)
   for _, id in ipairs(ids) do
@@ -21,20 +17,12 @@ local function lumdo_stage()
   return vars.varbits[config.varbits.lumdo]
 end
 
-local function wait_for_zone(zone, ticks)
-  for _ = 1, ticks do
-    gc.await { event = "game.tick" }
-    if in_zone(gc.read("player").world, zone) then return true end
-  end
-  return false
-end
-
 local function choose(dialogue, wanted)
   for _, option in ipairs(dialogue.options or {}) do
     if option.text == wanted or option.text == wanted .. "." then
       return gc.await {
         action = { type = "dialogue.choose", text = option.text },
-        breaks = false,
+        policy = { breaks = false, cursor_release = "none", fidget = "none" },
         timeout = { game_ticks = 30 },
       }
     end
@@ -42,14 +30,22 @@ local function choose(dialogue, wanted)
   return nil
 end
 
-local function conversation(target, completed, result, wanted_choice, ticks)
+local function dialogue_has_option(dialogue, wanted)
+  if dialogue.type ~= "choice" then return false end
+  for _, option in ipairs(dialogue.options or {}) do
+    if option.text == wanted or option.text == wanted .. "." then return true end
+  end
+  return false
+end
+
+local function conversation(target, completed, result, wanted_choice, ticks, policy)
   local initial_dialogue = gc.read("dialogue")
   local talked = { status = "dispatched", result = "existing_dialogue" }
   local target_talk_dispatched = false
   if initial_dialogue.type == "closed" then
     talked = gc.await {
       action = { type = "npc.interact", id = target.id, action = "Talk-to", within = 24 },
-      breaks = true,
+      policy = policy,
       timeout = { game_ticks = 40 },
     }
     if talked.status ~= "dispatched" then return nil, talked end
@@ -67,7 +63,7 @@ local function conversation(target, completed, result, wanted_choice, ticks)
       closed_ticks = 0
       local continued = gc.await {
         action = { type = "dialogue.continue" },
-        breaks = false,
+        policy = { breaks = false, cursor_release = "none", fidget = "none" },
         timeout = { game_ticks = 30 },
       }
       if continued.status ~= "dispatched" and
@@ -86,7 +82,13 @@ local function conversation(target, completed, result, wanted_choice, ticks)
           dialogue = dialogue,
         }
       end
-      if selected.status ~= "dispatched" then return nil, selected end
+      if selected.status ~= "dispatched" then
+        gc.await { event = "game.tick" }
+      end
+      if selected.status ~= "dispatched" and
+        dialogue_has_option(gc.read("dialogue"), wanted_choice) then
+        return nil, selected
+      end
     elseif opened then
       closed_ticks = closed_ticks + 1
       if progressed and closed_ticks >= 2 then
@@ -96,7 +98,6 @@ local function conversation(target, completed, result, wanted_choice, ticks)
         if not target_talk_dispatched then
           talked = gc.await {
             action = { type = "npc.interact", id = target.id, action = "Talk-to", within = 24 },
-            breaks = true,
             timeout = { game_ticks = 40 },
           }
           if talked.status ~= "dispatched" then return nil, talked end
@@ -120,53 +121,7 @@ local function conversation(target, completed, result, wanted_choice, ticks)
   }
 end
 
-local function travel_to_hangar()
-  if in_zone(gc.read("player").world, config.zones.post_puzzle_hangar) then
-    return { status = "complete", result = "post_puzzle_hangar_already_reached" }
-  end
-  local stronghold = navigation.travel_to_gnome_stronghold()
-  if stronghold.status ~= "complete" then return stronghold end
-  local target, failure = navigation.reach_daero()
-  if not target then return failure end
-  gc.activity("travel")
-  local traveled = gc.await {
-    action = { type = "npc.interact", id = target.id, action = "Travel", within = 24 },
-    breaks = true,
-    timeout = { game_ticks = 40 },
-  }
-  if traveled.status ~= "dispatched" then return traveled end
-  if not wait_for_zone(config.zones.post_puzzle_hangar, 50) then
-    return {
-      status = "monkey_madness_hangar_return_unverified",
-      receipt = traveled,
-      player = gc.read("player"),
-    }
-  end
-  return { status = "complete", result = "post_puzzle_hangar_reached", receipt = traveled }
-end
-
-local function fly_to_crash_island()
-  if in_zone(gc.read("player").world, config.zones.crash_island) then
-    return { status = "complete", result = "crash_island_already_reached" }
-  end
-  local target = npc(config.npcs.waydar, 30)
-  if not target then
-    return {
-      status = "monkey_madness_hangar_waydar_not_observed",
-      nearby = gc.read("npcs", { within = 30, limit = 50 }),
-    }
-  end
-  local completed, failure = conversation(
-    target,
-    function() return in_zone(gc.read("player").world, config.zones.crash_island) end,
-    "crash_island_reached",
-    "Yes",
-    120)
-  if not completed then return failure end
-  return completed
-end
-
-local function talk_lumdo_initial()
+local function talk_lumdo_initial(policy)
   if lumdo_stage() >= 2 then
     return { status = "complete", result = "lumdo_initial_already_complete" }
   end
@@ -179,11 +134,12 @@ local function talk_lumdo_initial()
     function() return lumdo_stage() >= 2 end,
     "lumdo_refusal_complete",
     nil,
-    240)
+    240,
+    policy)
   return completed or failure
 end
 
-local function ask_waydar_to_intervene()
+local function ask_waydar_to_intervene(policy)
   if lumdo_stage() >= 3 then
     return { status = "complete", result = "waydar_intervention_already_complete" }
   end
@@ -198,7 +154,8 @@ local function ask_waydar_to_intervene()
       function() return lumdo_stage() >= 3 end,
       "waydar_intervention_complete",
       "I cannot convince Lumdo to take us to the island...",
-      120)
+      120,
+      policy)
     if completed then return completed end
     last_failure = failure
     if failure.status ~= "monkey_madness_conversation_closed_without_progress" then
@@ -208,40 +165,64 @@ local function ask_waydar_to_intervene()
   return last_failure or { status = "monkey_madness_waydar_intervention_unverified" }
 end
 
-local function sail_to_ape_atoll()
-  if in_zone(gc.read("player").world, config.zones.ape_atoll_south) then
-    return { status = "complete", result = "ape_atoll_already_reached" }
+local function sail_to_ape_atoll(policy)
+  local continuation
+  while true do
+    local cured = gc.await {
+      action = { type = "consumable.cure_poison" },
+      policy = { breaks = false, cursor_release = "none", fidget = "none" },
+    }
+    if cured.status ~= "complete" and cured.status ~= "unchanged" then return cured end
+    local reached = movement.walk(config.points.ape_atoll_landing, 1, {
+      ticks = 300,
+      policy = policy,
+      interrupt_on = { dialogue = true, poisoned = true },
+      resume = continuation,
+    })
+    if reached.status == "arrived" then
+      return { status = "complete", result = "ape_atoll_reached", receipt = reached }
+    end
+    if reached.status ~= "interrupted" or reached.reason ~= "poisoned" or not reached.continuation then
+      return reached
+    end
+    continuation = reached.continuation
   end
-  local target = npc(config.npcs.lumdo, 24)
-  if not target then
-    return { status = "monkey_madness_return_lumdo_not_observed" }
-  end
-  local completed, failure = conversation(
-    target,
-    function() return in_zone(gc.read("player").world, config.zones.ape_atoll_south) end,
-    "ape_atoll_reached",
-    nil,
-    120)
-  return completed or failure
 end
 
-local function execute()
+local function execute(options)
+  options = options or {}
+  local policy = options.policy
   local armed, safety_error = preparation.arm_safety()
   if not armed then return safety_error end
-  if in_zone(gc.read("player").world, config.zones.ape_atoll_south) then
+  if geometry.in_zone(gc.read("player").world, config.zones.ape_atoll_south) then
     return { status = "complete", result = "ape_atoll_already_reached" }
   end
-  if not in_zone(gc.read("player").world, config.zones.crash_island) then
-    local hangar = travel_to_hangar()
-    if hangar.status ~= "complete" then return hangar end
-    local crash = fly_to_crash_island()
-    if crash.status ~= "complete" then return crash end
+  if not geometry.in_zone(gc.read("player").world, config.zones.crash_island) then
+    if not geometry.in_zone(gc.read("player").world, config.zones.post_puzzle_hangar) then
+      local stronghold = navigation.travel_to_gnome_stronghold(options)
+      if stronghold.status ~= "complete" then return stronghold end
+      gc.activity("travel")
+      local hangar = movement.walk(config.points.post_puzzle_landing, 1, {
+        ticks = 600,
+        policy = policy,
+        interrupt_on = { dialogue = true },
+      })
+      if hangar.status ~= "arrived" then return hangar end
+    end
+    local crash = movement.walk(config.points.crash_island_landing, 1, {
+      ticks = 300,
+      policy = policy,
+      interrupt_on = { dialogue = true },
+    })
+    if crash.status ~= "arrived" then return crash end
   end
-  local initial = talk_lumdo_initial()
+  local initial = talk_lumdo_initial(policy)
   if initial.status ~= "complete" then return initial end
-  local intervention = ask_waydar_to_intervene()
+  local intervention = ask_waydar_to_intervene(policy)
   if intervention.status ~= "complete" then return intervention end
-  return sail_to_ape_atoll()
+  return sail_to_ape_atoll(policy)
 end
 
-return { execute = execute }
+return {
+  execute = execute,
+}

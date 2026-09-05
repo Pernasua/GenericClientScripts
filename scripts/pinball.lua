@@ -1,3 +1,5 @@
+local failure = gc.require("shared_failure")
+
 local NPC_ID = 6744
 local ACCEPT_GAME = "Yes, pinball is fun."
 local EXIT_ID = 9293
@@ -19,13 +21,6 @@ local POSTS = {
   [4] = 9258, -- essence
 }
 
-local function fail(status, details)
-  local value = details or {}
-  value.status = status
-  gc.log("error", "pinball-failed", value)
-  error(status, 0)
-end
-
 local function object(id, action)
   local found = gc.read("objects", {
     id = id,
@@ -45,49 +40,48 @@ local function choose_game(dialogue)
     if option.text == ACCEPT_GAME then
       return gc.await {
         action = { type = "dialogue.choose", text = option.text },
-        breaks = false,
         timeout = { game_ticks = 20 },
       }
     end
   end
-  fail("unexpected_dialogue_choice", { dialogue = dialogue })
+  failure.raise("pinball-failed", "unexpected_dialogue_choice", { dialogue = dialogue })
 end
 
 local function enter_arena()
   if in_arena() then return end
 
-  local talked = gc.await {
-    action = { type = "npc.interact", id = NPC_ID, action = "Talk-to", within = 12 },
-    breaks = false,
-    timeout = { game_ticks = 30 },
-  }
-  if talked.status ~= "dispatched" then
-    fail("talk_failed", { receipt = talked })
-  end
-
-  for _ = 1, 60 do
-    if in_arena() then return end
-    local dialogue = gc.read("dialogue")
-    if dialogue.type == "continue" then
-      local continued = gc.await {
-        action = { type = "dialogue.continue" },
-        breaks = false,
-        timeout = { game_ticks = 20 },
-      }
-      if continued.status ~= "dispatched" then
-        fail("dialogue_continue_failed", { receipt = continued })
-      end
-    elseif dialogue.type == "choice" then
-      local chosen = choose_game(dialogue)
-      if chosen.status ~= "dispatched" then
-        fail("dialogue_choice_failed", { receipt = chosen })
-      end
-    else
-      gc.await { event = "game.tick" }
+  return gc.intent("pinball.accept_game", function()
+    local talked = gc.await {
+      action = { type = "npc.interact", id = NPC_ID, action = "Talk-to", within = 12 },
+      timeout = { game_ticks = 30 },
+    }
+    if talked.status ~= "dispatched" then
+      failure.raise("pinball-failed", "talk_failed", { receipt = talked })
     end
-  end
 
-  fail("arena_not_reached", { event = gc.read("random_event") })
+    for _ = 1, 60 do
+      if in_arena() then return end
+      local dialogue = gc.read("dialogue")
+      if dialogue.type == "continue" then
+        local continued = gc.await {
+          action = { type = "dialogue.continue" },
+          timeout = { game_ticks = 20 },
+        }
+        if continued.status ~= "dispatched" then
+          failure.raise("pinball-failed", "dialogue_continue_failed", { receipt = continued })
+        end
+      elseif dialogue.type == "choice" then
+        local chosen = choose_game(dialogue)
+        if chosen.status ~= "dispatched" then
+          failure.raise("pinball-failed", "dialogue_choice_failed", { receipt = chosen })
+        end
+      else
+        gc.await { event = "game.tick" }
+      end
+    end
+
+    failure.raise("pinball-failed", "arena_not_reached", { event = gc.read("random_event") })
+  end)
 end
 
 local function state()
@@ -111,11 +105,11 @@ local function tag_current()
   local before = state()
   local post_id = POSTS[before.current]
   if not post_id then
-    fail("unknown_post_code", { pinball = before })
+    failure.raise("pinball-failed", "unknown_post_code", { pinball = before })
   end
   local target = object(post_id, "Tag")
   if not target then
-    fail("post_not_observed", { post_id = post_id, pinball = before })
+    failure.raise("pinball-failed", "post_not_observed", { post_id = post_id, pinball = before })
   end
 
   local tagged = gc.await {
@@ -126,11 +120,11 @@ local function tag_current()
       world = target.world,
       within = 24,
     },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
     timeout = { game_ticks = 30 },
   }
   if tagged.status ~= "dispatched" then
-    fail("tag_failed", { receipt = tagged, pinball = before })
+    failure.raise("pinball-failed", "tag_failed", { receipt = tagged, pinball = before })
   end
 
   for _ = 1, 24 do
@@ -140,10 +134,10 @@ local function tag_current()
       return after
     end
     if after.score < before.score then
-      fail("score_reset", { before = before, after = after, post_id = post_id })
+      failure.raise("pinball-failed", "score_reset", { before = before, after = after, post_id = post_id })
     end
   end
-  fail("score_unchanged", { before = before, after = state(), post_id = post_id })
+  failure.raise("pinball-failed", "score_unchanged", { before = before, after = state(), post_id = post_id })
 end
 
 local function reward_message(since_tick)
@@ -159,7 +153,7 @@ end
 
 local function leave_arena()
   local exit = object(EXIT_ID, "Exit")
-  if not exit then fail("exit_not_observed") end
+  if not exit then failure.raise("pinball-failed", "exit_not_observed") end
   local started_tick = gc.read("runtime").game_tick
   local left = gc.await {
     action = {
@@ -169,11 +163,11 @@ local function leave_arena()
       world = exit.world,
       within = 24,
     },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
     timeout = { game_ticks = 30 },
   }
   if left.status ~= "dispatched" then
-    fail("exit_failed", { receipt = left })
+    failure.raise("pinball-failed", "exit_failed", { receipt = left })
   end
 
   for _ = 1, 40 do
@@ -181,7 +175,7 @@ local function leave_arena()
     local reward = reward_message(started_tick)
     if reward then return reward end
   end
-  fail("reward_not_observed", { messages = gc.read("messages", { limit = 20 }) })
+  failure.raise("pinball-failed", "reward_not_observed", { messages = gc.read("messages", { limit = 20 }) })
 end
 
 return {
@@ -198,7 +192,7 @@ return {
       pinball = tag_current()
     end
     if pinball.complete ~= 1 or pinball.score < 10 then
-      fail("game_not_complete", { pinball = pinball })
+      failure.raise("pinball-failed", "game_not_complete", { pinball = pinball })
     end
 
     local reward = leave_arena()

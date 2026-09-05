@@ -1,4 +1,5 @@
 local config = gc.require("fight_arena_config")
+local behaviors = gc.require("shared_behaviors")
 local state_module = gc.require("fight_arena_state")
 local quest = gc.require("fight_arena_quest")
 local shared = gc.require("shared_state")
@@ -82,9 +83,9 @@ local function terminal(state, phase)
 end
 
 local function stop(result, mouse_offscreen)
-  gc.await { action = { type = "safety.clear" }, breaks = false }
+  gc.await { action = { type = "safety.clear" }, policy = { breaks = false, cursor_release = "none", fidget = "none" } }
   if mouse_offscreen then
-    gc.await { action = { type = "mouse.offscreen" }, breaks = false }
+    gc.await { action = { type = "mouse.offscreen" }, policy = { breaks = false, cursor_release = "none", fidget = "none" } }
   end
   return result
 end
@@ -96,7 +97,7 @@ local function run(input)
   local initial_rank = checkpoint_rank[initial_phase] or -1
 
   if initial_phase == "complete" then
-    gc.await { action = { type = "mouse.offscreen" }, breaks = false }
+    gc.await { action = { type = "mouse.offscreen" }, policy = { breaks = false, cursor_release = "none", fidget = "none" } }
     return { status = "complete", quest = config.id, varp = initial.varp }
   end
   if initial_phase == "strict_stats_block" or initial_phase == "unknown_stage" then
@@ -110,14 +111,11 @@ local function run(input)
     initial_rank = checkpoint_rank[initial_phase] or -1
   end
 
-  local retaliate = gc.await {
-    action = { type = "combat.set_auto_retaliate", enabled = false },
-    breaks = false,
-    timeout = { game_ticks = 20 },
+  local configured, behavior_failure = behaviors.configure {
+    auto_retaliate = false,
+    emergency_escape = true,
   }
-  if retaliate.status ~= "set" and retaliate.status ~= "unchanged" then
-    return { status = "auto_retaliate_failed", receipt = retaliate }
-  end
+  if not configured then return behavior_failure end
   local safety = gc.await {
     action = {
       type = "safety.configure",
@@ -126,7 +124,7 @@ local function run(input)
       continue_after_consumable = true,
       allow_overheal = false,
     },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
   }
   if safety.status ~= "complete" then
     return { status = "safety_guard_failed", receipt = safety }
@@ -154,7 +152,7 @@ local function run(input)
         return stop({ status = "stopped", quest = config.id, phase = phase })
       end
       if break_bypass[phase] then
-        gc.phase("quest." .. config.id .. "." .. phase, { breaks = false })
+        gc.phase("quest." .. config.id .. "." .. phase, { policy = { breaks = false, cursor_release = "none", fidget = "none" } })
       else
         gc.phase("quest." .. config.id .. "." .. phase)
       end

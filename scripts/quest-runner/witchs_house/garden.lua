@@ -1,15 +1,5 @@
-local function walk(x, y, timeout, run)
-  return gc.await {
-    action = {
-      type = "walk.to",
-      destination = { x = x, y = y, plane = 0 },
-      within = 0,
-      run = run,
-    },
-    breaks = false,
-    timeout = { game_ticks = timeout or 300 },
-  }
-end
+local movement = gc.require("shared_movement")
+local item_queries = gc.require("shared_items")
 
 local function witch()
   return gc.read("npcs", { id = 3995, within = 100, limit = 1 })[1]
@@ -70,18 +60,12 @@ local function wait_at_most(maximum_x, timeout)
   return false
 end
 
-local function quantity(id)
-  local total = 0
-  for _, item in ipairs(gc.read("inventory").items) do
-    if item.id == id then
-      total = total + item.quantity
-    end
-  end
-  return total
-end
-
 local function move(receipts, x, y, timeout, run)
-  local receipt = walk(x, y, timeout, run)
+  local receipt = movement.walk({ x = x, y = y, plane = 0 }, 0, {
+    ticks = timeout or 300,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
+    run = run,
+  })
   table.insert(receipts, receipt)
   if receipt.status ~= "arrived" then
     return nil, { status = "garden_walk_failed", destination = { x = x, y = y }, receipt = receipt }
@@ -122,7 +106,7 @@ local function reach_east_cover(receipts)
         within = 0,
         run = false,
       },
-      breaks = false,
+      policy = { breaks = false, cursor_release = "none", fidget = "none" },
       timeout = { game_ticks = 1200 },
     }
     table.insert(receipts, staged)
@@ -195,7 +179,7 @@ local function execute()
       world = { x = 2909, y = 3470, plane = 0 },
       within = 4,
     },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
   }
   table.insert(receipts, fountain)
   if fountain.status ~= "dispatched" then
@@ -203,7 +187,7 @@ local function execute()
   end
   for _ = 1, 12 do
     gc.await { event = "game.tick" }
-    if quantity(2411) > 0 then
+    if item_queries.inventory_quantity(2411) > 0 then
       return { status = "complete", result = "garden_key_obtained", receipts = receipts }
     end
   end

@@ -1,4 +1,11 @@
-local INVITATION_NPC_ID = 390
+local failure = gc.require("shared_failure")
+local item_queries = gc.require("shared_items")
+local movement = gc.require("shared_movement")
+
+local INVITATION_NPC_IDS = {
+  [390] = true,
+  [6754] = true,
+}
 local ISLAND_BOB_NPC_ID = 391
 local SERVANT_NPC_ID = 393
 
@@ -39,21 +46,6 @@ local FISHING_SPOTS = {
   },
 }
 
-local function fail(status, details)
-  local value = details or {}
-  value.status = status
-  gc.log("error", "evil-bob-failed", value)
-  error(status, 0)
-end
-
-local function quantity(id)
-  local total = 0
-  for _, item in ipairs(gc.read("inventory").items or {}) do
-    if item.id == id then total = total + item.quantity end
-  end
-  return total
-end
-
 local function free_slots()
   return 28 - #(gc.read("inventory").items or {})
 end
@@ -73,14 +65,13 @@ local function wait_for(predicate, ticks)
   return predicate()
 end
 
-local function walk(world, within)
-  local receipt = gc.await {
-    action = { type = "walk.to", destination = world, within = within or 3, run = true },
-    breaks = false,
-    timeout = { game_ticks = 240 },
-  }
+local function reach(world, within)
+  local receipt = movement.walk(world, within, {
+    ticks = 240,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
+  })
   if receipt.status ~= "arrived" then
-    fail("evil_bob_walk_failed", { destination = world, receipt = receipt })
+    failure.raise("evil-bob-failed", "evil_bob_walk_failed", { destination = world, receipt = receipt })
   end
   return receipt
 end
@@ -88,13 +79,13 @@ end
 local function continue_dialogue()
   local receipt = gc.await {
     action = { type = "dialogue.continue" },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
     timeout = { game_ticks = 20 },
   }
   if receipt.status ~= "dispatched" and
     receipt.result ~= "dialogue_continue_not_visible" and
     receipt.result ~= "dialogue_is_choice" then
-    fail("evil_bob_dialogue_continue_failed", { receipt = receipt })
+    failure.raise("evil-bob-failed", "evil_bob_dialogue_continue_failed", { receipt = receipt })
   end
 end
 
@@ -103,16 +94,16 @@ local function choose_exact(dialogue, wanted)
     if option.text == wanted then
       local receipt = gc.await {
         action = { type = "dialogue.choose", text = option.text },
-        breaks = false,
+        policy = { breaks = false, cursor_release = "none", fidget = "none" },
         timeout = { game_ticks = 20 },
       }
       if receipt.status ~= "dispatched" then
-        fail("evil_bob_dialogue_choice_failed", { receipt = receipt, wanted = wanted })
+        failure.raise("evil-bob-failed", "evil_bob_dialogue_choice_failed", { receipt = receipt, wanted = wanted })
       end
       return
     end
   end
-  fail("evil_bob_dialogue_choice_not_observed", { wanted = wanted, dialogue = dialogue })
+  failure.raise("evil-bob-failed", "evil_bob_dialogue_choice_not_observed", { wanted = wanted, dialogue = dialogue })
 end
 
 local function drain_dialogue(ticks)
@@ -125,7 +116,7 @@ local function drain_dialogue(ticks)
       closed_ticks = 0
       continue_dialogue()
     elseif dialogue.type == "choice" then
-      fail("evil_bob_unexpected_dialogue_choice", { dialogue = dialogue })
+      failure.raise("evil-bob-failed", "evil_bob_unexpected_dialogue_choice", { dialogue = dialogue })
     elseif opened then
       closed_ticks = closed_ticks + 1
       if closed_ticks >= 2 then return end
@@ -134,7 +125,7 @@ local function drain_dialogue(ticks)
       return
     end
   end
-  fail("evil_bob_dialogue_did_not_close", { dialogue = gc.read("dialogue") })
+  failure.raise("evil-bob-failed", "evil_bob_dialogue_did_not_close", { dialogue = gc.read("dialogue") })
 end
 
 local function drain_arrival_dialogue()
@@ -147,7 +138,7 @@ local function drain_arrival_dialogue()
   end
 end
 
-local function enter_island()
+local function enter_island(invitation_npc_id)
   if on_island() then return end
 
   local talked = false
@@ -162,15 +153,15 @@ local function enter_island()
       local receipt = gc.await {
         action = {
           type = "npc.interact",
-          id = INVITATION_NPC_ID,
+          id = invitation_npc_id,
           action = "Talk-to",
           within = 12,
         },
-        breaks = false,
+        policy = { breaks = false, cursor_release = "none", fidget = "none" },
         timeout = { game_ticks = 30 },
       }
       if receipt.status ~= "dispatched" then
-        fail("evil_bob_invitation_talk_failed", {
+        failure.raise("evil-bob-failed", "evil_bob_invitation_talk_failed", {
           receipt = receipt,
           event = gc.read("random_event"),
         })
@@ -181,41 +172,41 @@ local function enter_island()
     end
   end
 
-  fail("evil_bob_island_entry_not_observed", {
+  failure.raise("evil-bob-failed", "evil_bob_island_entry_not_observed", {
     player = gc.read("player"),
     dialogue = gc.read("dialogue"),
   })
 end
 
 local function ensure_net()
-  if quantity(NET_ITEM_ID) > 0 then return end
+  if item_queries.inventory_quantity(NET_ITEM_ID) > 0 then return end
   if free_slots() < 2 then
-    fail("evil_bob_needs_two_free_inventory_slots", { inventory = gc.read("inventory") })
+    failure.raise("evil-bob-failed", "evil_bob_needs_two_free_inventory_slots", { inventory = gc.read("inventory") })
   end
 
-  walk(NET, 3)
+  reach(NET, 3)
   local receipt = gc.await {
     action = { type = "ground_item.take", id = NET_ITEM_ID, world = NET, within = 8 },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
     timeout = { game_ticks = 30 },
   }
   if receipt.status ~= "dispatched" or not wait_for(function()
-    return quantity(NET_ITEM_ID) > 0
+    return item_queries.inventory_quantity(NET_ITEM_ID) > 0
   end, 20) then
-    fail("evil_bob_net_not_obtained", { receipt = receipt, inventory = gc.read("inventory") })
+    failure.raise("evil-bob-failed", "evil_bob_net_not_obtained", { receipt = receipt, inventory = gc.read("inventory") })
   end
 end
 
 local function talk_to_servant()
   drain_dialogue(30)
-  walk(CENTRE, 4)
+  reach(CENTRE, 4)
   local receipt = gc.await {
     action = { type = "npc.interact", id = SERVANT_NPC_ID, action = "Talk-to", within = 16 },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
     timeout = { game_ticks = 30 },
   }
   if receipt.status ~= "dispatched" then
-    fail("evil_bob_servant_talk_failed", { receipt = receipt })
+    failure.raise("evil-bob-failed", "evil_bob_servant_talk_failed", { receipt = receipt })
   end
 
   local opened = false
@@ -227,7 +218,7 @@ local function talk_to_servant()
       closed_ticks = 0
       continue_dialogue()
     elseif dialogue.type == "choice" then
-      fail("evil_bob_servant_unexpected_choice", { dialogue = dialogue })
+      failure.raise("evil-bob-failed", "evil_bob_servant_unexpected_choice", { dialogue = dialogue })
     elseif opened then
       closed_ticks = closed_ticks + 1
       if closed_ticks >= 2 then return end
@@ -236,11 +227,11 @@ local function talk_to_servant()
       gc.await { event = "game.tick" }
     end
   end
-  fail("evil_bob_servant_dialogue_not_observed", { receipt = receipt })
+  failure.raise("evil-bob-failed", "evil_bob_servant_dialogue_not_observed", { receipt = receipt })
 end
 
 local function fish(spot)
-  walk(spot.approach, 2)
+  reach(spot.approach, 2)
   local receipt = gc.await {
     action = {
       type = "object.interact",
@@ -249,20 +240,20 @@ local function fish(spot)
       world = spot.world,
       within = 12,
     },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
     timeout = { game_ticks = 30 },
   }
   if receipt.status ~= "dispatched" then
-    fail("evil_bob_fishing_dispatch_failed", { spot = spot.name, receipt = receipt })
+    failure.raise("evil-bob-failed", "evil_bob_fishing_dispatch_failed", { spot = spot.name, receipt = receipt })
   end
 
   for _ = 1, 35 do
-    if quantity(CORRECT_COOKED_FISH_ID) > 0 then return true end
-    if quantity(WRONG_COOKED_FISH_ID) > 0 then return false end
+    if item_queries.inventory_quantity(CORRECT_COOKED_FISH_ID) > 0 then return true end
+    if item_queries.inventory_quantity(WRONG_COOKED_FISH_ID) > 0 then return false end
     local dialogue = gc.read("dialogue")
     if dialogue.type == "continue" then continue_dialogue() else gc.await { event = "game.tick" } end
   end
-  fail("evil_bob_fishing_result_not_observed", {
+  failure.raise("evil-bob-failed", "evil_bob_fishing_result_not_observed", {
     spot = spot.name,
     receipt = receipt,
     inventory = gc.read("inventory"),
@@ -280,23 +271,23 @@ local function affirmative_option(dialogue)
 end
 
 local function destroy_wrong_fish()
-  if quantity(WRONG_COOKED_FISH_ID) == 0 then return end
+  if item_queries.inventory_quantity(WRONG_COOKED_FISH_ID) == 0 then return end
   local receipt = gc.await {
     action = { type = "item.interact", id = WRONG_COOKED_FISH_ID, action = "Destroy" },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
     timeout = { game_ticks = 20 },
   }
   if receipt.status ~= "dispatched" then
-    fail("evil_bob_wrong_fish_destroy_failed", { receipt = receipt })
+    failure.raise("evil-bob-failed", "evil_bob_wrong_fish_destroy_failed", { receipt = receipt })
   end
 
   for _ = 1, 30 do
-    if quantity(WRONG_COOKED_FISH_ID) == 0 then return end
+    if item_queries.inventory_quantity(WRONG_COOKED_FISH_ID) == 0 then return end
     local dialogue = gc.read("dialogue")
     if dialogue.type == "choice" then
       local option = affirmative_option(dialogue)
       if not option then
-        fail("evil_bob_destroy_confirmation_unknown", { dialogue = dialogue })
+        failure.raise("evil-bob-failed", "evil_bob_destroy_confirmation_unknown", { dialogue = dialogue })
       end
       choose_exact(dialogue, option)
     elseif dialogue.type == "continue" then
@@ -305,11 +296,11 @@ local function destroy_wrong_fish()
       gc.await { event = "game.tick" }
     end
   end
-  fail("evil_bob_wrong_fish_remained", { inventory = gc.read("inventory") })
+  failure.raise("evil-bob-failed", "evil_bob_wrong_fish_remained", { inventory = gc.read("inventory") })
 end
 
 local function obtain_correct_fish()
-  if quantity(CORRECT_COOKED_FISH_ID) > 0 then return {} end
+  if item_queries.inventory_quantity(CORRECT_COOKED_FISH_ID) > 0 then return {} end
   destroy_wrong_fish()
 
   local tried = {}
@@ -319,16 +310,16 @@ local function obtain_correct_fish()
     if fish(spot) then return tried end
     destroy_wrong_fish()
   end
-  fail("evil_bob_correct_fishing_spot_not_found", { tried = tried })
+  failure.raise("evil-bob-failed", "evil_bob_correct_fishing_spot_not_found", { tried = tried })
 end
 
 local function uncook_fish()
-  if quantity(CORRECT_RAW_FISH_ID) > 0 then return end
-  if quantity(CORRECT_COOKED_FISH_ID) == 0 then
-    fail("evil_bob_correct_fish_missing_before_uncook")
+  if item_queries.inventory_quantity(CORRECT_RAW_FISH_ID) > 0 then return end
+  if item_queries.inventory_quantity(CORRECT_COOKED_FISH_ID) == 0 then
+    failure.raise("evil-bob-failed", "evil_bob_correct_fish_missing_before_uncook")
   end
 
-  walk(CENTRE, 5)
+  reach(CENTRE, 5)
   local receipt = gc.await {
     action = {
       type = "item.use_on_object",
@@ -336,13 +327,13 @@ local function uncook_fish()
       object_id = UNCOOKING_POT_OBJECT_ID,
       within = 24,
     },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
     timeout = { game_ticks = 30 },
   }
   if receipt.status ~= "dispatched" or not wait_for(function()
-    return quantity(CORRECT_RAW_FISH_ID) > 0
+    return item_queries.inventory_quantity(CORRECT_RAW_FISH_ID) > 0
   end, 30) then
-    fail("evil_bob_fish_not_uncooked", { receipt = receipt, inventory = gc.read("inventory") })
+    failure.raise("evil-bob-failed", "evil_bob_fish_not_uncooked", { receipt = receipt, inventory = gc.read("inventory") })
   end
 end
 
@@ -354,7 +345,7 @@ local function catnap_message(since_tick)
 end
 
 local function feed_bob(started_tick)
-  walk(CENTRE, 5)
+  reach(CENTRE, 5)
   local receipt = gc.await {
     action = {
       type = "item.use_on_npc",
@@ -363,11 +354,11 @@ local function feed_bob(started_tick)
       npc_name = "Evil Bob",
       within = 20,
     },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
     timeout = { game_ticks = 30 },
   }
   if receipt.status ~= "dispatched" then
-    fail("evil_bob_feeding_failed", { receipt = receipt })
+    failure.raise("evil-bob-failed", "evil_bob_feeding_failed", { receipt = receipt })
   end
 
   for _ = 1, 80 do
@@ -379,28 +370,31 @@ local function feed_bob(started_tick)
     local dialogue = gc.read("dialogue")
     if dialogue.type == "continue" then continue_dialogue() else gc.await { event = "game.tick" } end
   end
-  fail("evil_bob_catnap_not_observed", {
+  failure.raise("evil-bob-failed", "evil_bob_catnap_not_observed", {
     receipt = receipt,
     messages = gc.read("messages", { since_tick = started_tick, limit = 40 }),
   })
 end
 
 local function exit_island()
-  walk(CENTRE, 5)
+  reach(CENTRE, 5)
   local receipt = gc.await {
     action = { type = "object.interact", id = EXIT_PORTAL_OBJECT_ID, action = "Enter", within = 24 },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
     timeout = { game_ticks = 30 },
   }
   if receipt.status ~= "dispatched" or not wait_for(function() return not on_island() end, 80) then
-    fail("evil_bob_exit_not_observed", { receipt = receipt, player = gc.read("player") })
+    failure.raise("evil-bob-failed", "evil_bob_exit_not_observed", { receipt = receipt, player = gc.read("player") })
   end
   return receipt
 end
 
-local function solve(started_tick)
+local function solve(started_tick, invitation_npc_id)
   started_tick = started_tick or gc.read("runtime").game_tick
-  enter_island()
+  if not INVITATION_NPC_IDS[invitation_npc_id] then
+    failure.raise("evil-bob-failed", "evil_bob_invitation_npc_unknown", { npc_id = invitation_npc_id })
+  end
+  enter_island(invitation_npc_id)
   drain_arrival_dialogue()
   ensure_net()
   local tried = obtain_correct_fish()
@@ -417,6 +411,6 @@ local function solve(started_tick)
 end
 
 return {
-  invitation_npc_id = INVITATION_NPC_ID,
+  is_invitation_npc = function(id) return INVITATION_NPC_IDS[id] == true end,
   solve = solve,
 }

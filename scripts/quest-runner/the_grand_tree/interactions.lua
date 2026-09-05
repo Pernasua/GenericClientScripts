@@ -19,7 +19,6 @@ local function choose(dialogue, choices)
         table.remove(choices, choice_index)
         return gc.await {
           action = { type = "dialogue.choose", text = wanted },
-          breaks = false,
           timeout = { game_ticks = 20 },
         }
       end
@@ -44,7 +43,6 @@ local function finish_dialogue(predicate, choices, since_tick)
       closed_ticks = 0
       local receipt = gc.await {
         action = { type = "dialogue.continue" },
-        breaks = false,
         timeout = { game_ticks = 20 },
       }
       if receipt.status ~= "dispatched" then return nil, receipt end
@@ -64,52 +62,54 @@ local function finish_dialogue(predicate, choices, since_tick)
 end
 
 local function drain_continue_dialogue()
-  for _ = 1, 20 do
-    local dialogue = gc.read("dialogue")
-    if dialogue.type == "continue" then
-      local receipt = gc.await {
-        action = { type = "dialogue.continue" },
-        breaks = false,
-        timeout = { game_ticks = 20 },
-      }
-      if receipt.status ~= "dispatched" then return receipt end
-      gc.await { event = "game.tick" }
-    elseif dialogue.type == "choice" then
-      return { status = "unexpected_grand_tree_dialogue", dialogue = dialogue }
-    else
-      return { status = "complete", result = "continue_dialogue_drained" }
+  return gc.intent("grand_tree.finish_dialogue", function()
+    for _ = 1, 20 do
+      local dialogue = gc.read("dialogue")
+      if dialogue.type == "continue" then
+        local receipt = gc.await {
+          action = { type = "dialogue.continue" },
+          timeout = { game_ticks = 20 },
+        }
+        if receipt.status ~= "dispatched" then return receipt end
+        gc.await { event = "game.tick" }
+      elseif dialogue.type == "choice" then
+        return { status = "unexpected_grand_tree_dialogue", dialogue = dialogue }
+      else
+        return { status = "complete", result = "continue_dialogue_drained" }
+      end
     end
-  end
-  return { status = "dialogue_drain_timeout", dialogue = gc.read("dialogue") }
+    return { status = "dialogue_drain_timeout", dialogue = gc.read("dialogue") }
+  end)
 end
 
 local function talk_narnode()
-  local started_tick = gc.read("runtime").game_tick
-  local clicked = { status = "dispatched", result = "resumed_open_dialogue" }
-  if not gc.read("dialogue").open then
-    local target = npc(config.npcs.king_narnode, 20, true)
-    if not target then
-      return {
-        status = "king_narnode_not_reachable",
-        nearby = gc.read("npcs", { within = 20, limit = 30 }),
+  return gc.intent("grand_tree.talk_narnode", function()
+    local started_tick = gc.read("runtime").game_tick
+    local clicked = { status = "dispatched", result = "resumed_open_dialogue" }
+    if not gc.read("dialogue").open then
+      local target = npc(config.npcs.king_narnode, 20, true)
+      if not target then
+        return {
+          status = "king_narnode_not_reachable",
+          nearby = gc.read("npcs", { within = 20, limit = 30 }),
+        }
+      end
+      clicked = gc.await {
+        action = { type = "npc.interact", id = target.id, action = "Talk-to", within = 20 },
+        timeout = { game_ticks = 40 },
       }
+      if clicked.status ~= "dispatched" then return clicked end
     end
-    clicked = gc.await {
-      action = { type = "npc.interact", id = target.id, action = "Talk-to", within = 20 },
-      breaks = true,
-      timeout = { game_ticks = 40 },
-    }
-    if clicked.status ~= "dispatched" then return clicked end
-  end
-  local finished, failure = finish_dialogue(
-    function()
-      local vars = gc.read("vars", { varps = { config.varp } })
-      return vars.varps[config.varp] >= 10
-    end,
-    { "You seem worried, what's up?", "Yes.", "I'd be happy to help!" },
-    started_tick)
-  if not finished then return failure end
-  return { status = "complete", result = "grand_tree_start_verified", receipt = clicked }
+    local finished, failure = finish_dialogue(
+      function()
+        local vars = gc.read("vars", { varps = { config.varp } })
+        return vars.varps[config.varp] >= 10
+      end,
+      { "You seem worried, what's up?", "Yes.", "I'd be happy to help!" },
+      started_tick)
+    if not finished then return failure end
+    return { status = "complete", result = "grand_tree_start_verified", receipt = clicked }
+  end)
 end
 
 local function object(id, action, within)
@@ -121,68 +121,34 @@ local function object(id, action, within)
   })[1]
 end
 
-local function climb_hazelmere()
-  local world = gc.read("player").world
-  if world.plane == 1 and math.max(
-    math.abs(world.x - config.points.hazelmere_upstairs.x),
-    math.abs(world.y - config.points.hazelmere_upstairs.y)) <= 8 then
-    return { status = "complete", result = "hazelmere_ladder_already_climbed" }
-  end
-  local ladder = object(config.objects.hazelmere_ladder, "Climb-up", 12)
-  if not ladder then
-    return {
-      status = "hazelmere_ladder_not_observed",
-      objects = gc.read("objects", { within = 12, limit = 40 }),
-    }
-  end
-  local climbed = gc.await {
-    action = {
-      type = "object.interact",
-      id = ladder.id,
-      action = "Climb-up",
-      world = ladder.world,
-      within = 12,
-    },
-    breaks = true,
-    timeout = { game_ticks = 30 },
-  }
-  if climbed.status ~= "dispatched" then return climbed end
-  for _ = 1, 30 do
-    gc.await { event = "game.tick" }
-    if gc.read("player").world.plane == 1 then
-      return { status = "complete", result = "hazelmere_ladder_climbed", receipt = climbed }
-    end
-  end
-  return { status = "hazelmere_ladder_unverified", receipt = climbed }
-end
-
 local function talk_hazelmere()
-  local started_tick = gc.read("runtime").game_tick
-  local clicked = { status = "dispatched", result = "resumed_open_dialogue" }
-  if not gc.read("dialogue").open then
-    local target = npc(config.npcs.hazelmere, 16, true)
-    if not target then
-      return {
-        status = "hazelmere_not_reachable",
-        nearby = gc.read("npcs", { within = 20, limit = 30 }),
+  return gc.intent("grand_tree.talk_hazelmere", function()
+    local started_tick = gc.read("runtime").game_tick
+    local clicked = { status = "dispatched", result = "resumed_open_dialogue" }
+    if not gc.read("dialogue").open then
+      local target = npc(config.npcs.hazelmere, 16, true)
+      if not target then
+        return {
+          status = "hazelmere_not_reachable",
+          nearby = gc.read("npcs", { within = 20, limit = 30 }),
+        }
+      end
+      clicked = gc.await {
+        action = { type = "npc.interact", id = target.id, action = "Talk-to", within = 16 },
+        timeout = { game_ticks = 40 },
       }
+      if clicked.status ~= "dispatched" then return clicked end
     end
-    clicked = gc.await {
-      action = { type = "npc.interact", id = target.id, action = "Talk-to", within = 16 },
-      breaks = true,
-      timeout = { game_ticks = 40 },
-    }
-    if clicked.status ~= "dispatched" then return clicked end
-  end
-  local finished, failure = finish_dialogue(
-    function()
-      local vars = gc.read("vars", { varps = { config.varp } })
-      return vars.varps[config.varp] >= 20
-    end,
-    {},
-    started_tick)
-  if not finished then return failure end
-  return { status = "complete", result = "hazelmere_translation_verified", receipt = clicked }
+    local finished, failure = finish_dialogue(
+      function()
+        local vars = gc.read("vars", { varps = { config.varp } })
+        return vars.varps[config.varp] >= 20
+      end,
+      {},
+      started_tick)
+    if not finished then return failure end
+    return { status = "complete", result = "hazelmere_translation_verified", receipt = clicked }
+  end)
 end
 
 local TRANSLATION_CHOICES = {
@@ -198,7 +164,6 @@ local function choose_translation(dialogue)
       if option.text == wanted then
         return gc.await {
           action = { type = "dialogue.choose", text = wanted },
-          breaks = false,
           timeout = { game_ticks = 20 },
         }
       end
@@ -208,7 +173,6 @@ local function choose_translation(dialogue)
     if option.text == "None of the above." then
       return gc.await {
         action = { type = "dialogue.choose", text = option.text },
-        breaks = false,
         timeout = { game_ticks = 20 },
       }
     end
@@ -221,242 +185,115 @@ local function talk_narnode_translation()
   if not target then
     return { status = "king_narnode_not_reachable_for_translation" }
   end
-  local started_tick = gc.read("runtime").game_tick
-  local clicked = gc.await {
-    action = { type = "npc.interact", id = target.id, action = "Talk-to", within = 20 },
-    breaks = false,
-    timeout = { game_ticks = 40 },
-  }
-  if clicked.status ~= "dispatched" then return clicked end
-  local progressed = false
-  local closed_ticks = 0
-  for _ = 1, 160 do
-    gc.await { event = "game.tick" }
-    local vars = gc.read("vars", { varps = { config.varp } })
-    progressed = progressed or vars.varps[config.varp] >= 30
-    for _, message in ipairs(gc.read("messages", { since_tick = started_tick, limit = 10 })) do
-      if string.find(string.lower(message.text or ""), "can't reach that", 1, true) then
-        return { status = "king_narnode_unreachable_for_translation", message = message }
-      end
-    end
-    local dialogue = gc.read("dialogue")
-    if dialogue.type == "continue" then
-      closed_ticks = 0
-      local receipt = gc.await {
-        action = { type = "dialogue.continue" },
-        breaks = false,
-        timeout = { game_ticks = 20 },
-      }
-      if receipt.status ~= "dispatched" then return receipt end
-    elseif dialogue.type == "choice" then
-      closed_ticks = 0
-      local receipt = choose_translation(dialogue)
-      if receipt.status ~= "dispatched" then return receipt end
-    elseif progressed then
-      closed_ticks = closed_ticks + 1
-      if closed_ticks >= 2 then
-        return { status = "complete", result = "narnode_translation_verified", receipt = clicked }
-      end
-    end
-  end
-  return {
-    status = "narnode_translation_timeout",
-    varp = gc.read("vars", { varps = { config.varp } }),
-    dialogue = gc.read("dialogue"),
-  }
-end
-
-local function climb_glough()
-  if gc.read("player").world.plane == 1 then
-    return { status = "complete", result = "glough_ladder_already_climbed" }
-  end
-  local ladder = object(config.objects.glough_ladder, "Climb-up", 12)
-  if not ladder then
-    return {
-      status = "glough_ladder_not_observed",
-      objects = gc.read("objects", { within = 12, limit = 40 }),
+  return gc.intent("grand_tree.talk_narnode_translation", function()
+    local started_tick = gc.read("runtime").game_tick
+    local clicked = gc.await {
+      action = { type = "npc.interact", id = target.id, action = "Talk-to", within = 20 },
+      timeout = { game_ticks = 40 },
     }
-  end
-  local climbed = gc.await {
-    action = {
-      type = "object.interact",
-      id = ladder.id,
-      action = "Climb-up",
-      world = ladder.world,
-      within = 12,
-    },
-    breaks = true,
-    timeout = { game_ticks = 30 },
-  }
-  if climbed.status ~= "dispatched" then return climbed end
-  for _ = 1, 30 do
-    gc.await { event = "game.tick" }
-    if gc.read("player").world.plane == 1 then
-      return { status = "complete", result = "glough_ladder_climbed", receipt = climbed }
+    if clicked.status ~= "dispatched" then return clicked end
+    local progressed = false
+    local closed_ticks = 0
+    for _ = 1, 160 do
+      gc.await { event = "game.tick" }
+      local vars = gc.read("vars", { varps = { config.varp } })
+      progressed = progressed or vars.varps[config.varp] >= 30
+      for _, message in ipairs(gc.read("messages", { since_tick = started_tick, limit = 10 })) do
+        if string.find(string.lower(message.text or ""), "can't reach that", 1, true) then
+          return { status = "king_narnode_unreachable_for_translation", message = message }
+        end
+      end
+      local dialogue = gc.read("dialogue")
+      if dialogue.type == "continue" then
+        closed_ticks = 0
+        local receipt = gc.await {
+          action = { type = "dialogue.continue" },
+          timeout = { game_ticks = 20 },
+        }
+        if receipt.status ~= "dispatched" then return receipt end
+      elseif dialogue.type == "choice" then
+        closed_ticks = 0
+        local receipt = choose_translation(dialogue)
+        if receipt.status ~= "dispatched" then return receipt end
+      elseif progressed then
+        closed_ticks = closed_ticks + 1
+        if closed_ticks >= 2 then
+          return { status = "complete", result = "narnode_translation_verified", receipt = clicked }
+        end
+      end
     end
-  end
-  return { status = "glough_ladder_unverified", receipt = climbed }
+    return {
+      status = "narnode_translation_timeout",
+      varp = gc.read("vars", { varps = { config.varp } }),
+      dialogue = gc.read("dialogue"),
+    }
+  end)
 end
 
 local function talk_glough()
   local target = npc(config.npcs.glough, 16, true)
   if not target then return { status = "glough_not_reachable" } end
-  local started_tick = gc.read("runtime").game_tick
-  local clicked = gc.await {
-    action = { type = "npc.interact", id = target.id, action = "Talk-to", within = 16 },
-    breaks = false,
-    timeout = { game_ticks = 40 },
-  }
-  if clicked.status ~= "dispatched" then return clicked end
-  local finished, failure = finish_dialogue(
-    function()
-      local vars = gc.read("vars", { varps = { config.varp } })
-      return vars.varps[config.varp] >= 40
-    end,
-    {},
-    started_tick)
-  if not finished then return failure end
-  return { status = "complete", result = "glough_warning_verified", receipt = clicked }
-end
-
-local function descend_glough()
-  if gc.read("player").world.plane == 0 then
-    return { status = "complete", result = "glough_ladder_already_descended" }
-  end
-  local ladder = object(config.objects.glough_ladder_down, "Climb-down", 12)
-  if not ladder then
-    return {
-      status = "glough_descent_not_observed",
-      objects = gc.read("objects", { within = 12, limit = 40 }),
+  return gc.intent("grand_tree.talk_glough", function()
+    local started_tick = gc.read("runtime").game_tick
+    local clicked = gc.await {
+      action = { type = "npc.interact", id = target.id, action = "Talk-to", within = 16 },
+      timeout = { game_ticks = 40 },
     }
-  end
-  local descended = gc.await {
-    action = {
-      type = "object.interact",
-      id = ladder.id,
-      action = "Climb-down",
-      world = ladder.world,
-      within = 12,
-    },
-    breaks = true,
-    timeout = { game_ticks = 30 },
-  }
-  if descended.status ~= "dispatched" then return descended end
-  for _ = 1, 30 do
-    gc.await { event = "game.tick" }
-    if gc.read("player").world.plane == 0 then
-      return { status = "complete", result = "glough_ladder_descended", receipt = descended }
-    end
-  end
-  return { status = "glough_descent_unverified", receipt = descended }
+    if clicked.status ~= "dispatched" then return clicked end
+    local finished, failure = finish_dialogue(
+      function()
+        local vars = gc.read("vars", { varps = { config.varp } })
+        return vars.varps[config.varp] >= 40
+      end,
+      {},
+      started_tick)
+    if not finished then return failure end
+    return { status = "complete", result = "glough_warning_verified", receipt = clicked }
+  end)
 end
 
 local function talk_narnode_after_glough()
   local target = npc(config.npcs.king_narnode, 20, true)
   if not target then return { status = "king_narnode_not_reachable_after_glough" } end
-  local started_tick = gc.read("runtime").game_tick
-  local clicked = gc.await {
-    action = { type = "npc.interact", id = target.id, action = "Talk-to", within = 20 },
-    breaks = false,
-    timeout = { game_ticks = 40 },
-  }
-  if clicked.status ~= "dispatched" then return clicked end
-  local finished, failure = finish_dialogue(
-    function()
-      local vars = gc.read("vars", { varps = { config.varp } })
-      return vars.varps[config.varp] >= 50
-    end,
-    {},
-    started_tick)
-  if not finished then return failure end
-  return { status = "complete", result = "narnode_after_glough_verified", receipt = clicked }
-end
-
-local function climb_grand_tree_top()
-  if gc.read("player").world.plane == 3 then
-    return { status = "complete", result = "grand_tree_top_already_reached" }
-  end
-  local ladder = object(config.objects.grand_tree_ladder, "Top-Floor", 12)
-  if not ladder then
-    return {
-      status = "grand_tree_top_ladder_not_observed",
-      player = gc.read("player"),
-      objects = gc.read("objects", { within = 12, limit = 40 }),
+  return gc.intent("grand_tree.talk_narnode_after_glough", function()
+    local started_tick = gc.read("runtime").game_tick
+    local clicked = gc.await {
+      action = { type = "npc.interact", id = target.id, action = "Talk-to", within = 20 },
+      timeout = { game_ticks = 40 },
     }
-  end
-  local climbed = gc.await {
-    action = {
-      type = "object.interact",
-      id = ladder.id,
-      action = "Top-Floor",
-      world = ladder.world,
-      within = 12,
-    },
-    breaks = true,
-    timeout = { game_ticks = 40 },
-  }
-  if climbed.status ~= "dispatched" then return climbed end
-  for _ = 1, 40 do
-    gc.await { event = "game.tick" }
-    if gc.read("player").world.plane == 3 then
-      return { status = "complete", result = "grand_tree_top_reached", receipt = climbed }
-    end
-  end
-  return { status = "grand_tree_top_unverified", receipt = climbed }
+    if clicked.status ~= "dispatched" then return clicked end
+    local finished, failure = finish_dialogue(
+      function()
+        local vars = gc.read("vars", { varps = { config.varp } })
+        return vars.varps[config.varp] >= 50
+      end,
+      {},
+      started_tick)
+    if not finished then return failure end
+    return { status = "complete", result = "narnode_after_glough_verified", receipt = clicked }
+  end)
 end
 
 local function talk_charlie()
   local target = npc(config.npcs.charlie, 20, true)
   if not target then return { status = "charlie_not_reachable" } end
-  local started_tick = gc.read("runtime").game_tick
-  local clicked = gc.await {
-    action = { type = "npc.interact", id = target.id, action = "Talk-to", within = 20 },
-    breaks = false,
-    timeout = { game_ticks = 40 },
-  }
-  if clicked.status ~= "dispatched" then return clicked end
-  local finished, failure = finish_dialogue(
-    function()
-      local vars = gc.read("vars", { varps = { config.varp } })
-      return vars.varps[config.varp] >= 60
-    end,
-    {},
-    started_tick)
-  if not finished then return failure end
-  return { status = "complete", result = "charlie_investigation_verified", receipt = clicked }
-end
-
-local function descend_grand_tree_bottom()
-  if gc.read("player").world.plane == 0 then
-    return { status = "complete", result = "grand_tree_bottom_already_reached" }
-  end
-  local ladder = object(config.objects.grand_tree_ladder_top, "Bottom-Floor", 12)
-  if not ladder then
-    return {
-      status = "grand_tree_bottom_ladder_not_observed",
-      player = gc.read("player"),
-      objects = gc.read("objects", { within = 12, limit = 40 }),
+  return gc.intent("grand_tree.talk_charlie", function()
+    local started_tick = gc.read("runtime").game_tick
+    local clicked = gc.await {
+      action = { type = "npc.interact", id = target.id, action = "Talk-to", within = 20 },
+      timeout = { game_ticks = 40 },
     }
-  end
-  local descended = gc.await {
-    action = {
-      type = "object.interact",
-      id = ladder.id,
-      action = "Bottom-Floor",
-      world = ladder.world,
-      within = 12,
-    },
-    breaks = true,
-    timeout = { game_ticks = 40 },
-  }
-  if descended.status ~= "dispatched" then return descended end
-  for _ = 1, 40 do
-    gc.await { event = "game.tick" }
-    if gc.read("player").world.plane == 0 then
-      return { status = "complete", result = "grand_tree_bottom_reached", receipt = descended }
-    end
-  end
-  return { status = "grand_tree_bottom_unverified", receipt = descended }
+    if clicked.status ~= "dispatched" then return clicked end
+    local finished, failure = finish_dialogue(
+      function()
+        local vars = gc.read("vars", { varps = { config.varp } })
+        return vars.varps[config.varp] >= 60
+      end,
+      {},
+      started_tick)
+    if not finished then return failure end
+    return { status = "complete", result = "charlie_investigation_verified", receipt = clicked }
+  end)
 end
 
 local function has_inventory_item(id)
@@ -470,122 +307,125 @@ local function search_glough_cupboard()
   if has_inventory_item(config.items.glough_journal) then
     return { status = "complete", result = "glough_journal_already_owned" }
   end
-  local cupboard = object(config.objects.glough_cupboard_open, "Search", 12)
-  local closed = object(config.objects.glough_cupboard_closed, "Open", 12)
-  if not cupboard and closed then
-    local opened = gc.await {
+  return gc.intent("grand_tree.search_glough_cupboard", function()
+    local cupboard = object(config.objects.glough_cupboard_open, "Search", 12)
+    local closed = object(config.objects.glough_cupboard_closed, "Open", 12)
+    if not cupboard and closed then
+      local opened = gc.await {
+        action = {
+          type = "object.interact",
+          id = closed.id,
+          action = "Open",
+          world = closed.world,
+          within = 12,
+        },
+        timeout = { game_ticks = 30 },
+      }
+      if opened.status ~= "dispatched" then return opened end
+      for _ = 1, 20 do
+        gc.await { event = "game.tick" }
+        cupboard = object(config.objects.glough_cupboard_open, "Search", 12)
+        if cupboard then break end
+      end
+    end
+    if not cupboard then
+      return {
+        status = "glough_cupboard_not_observed",
+        objects = gc.read("objects", { within = 12, limit = 50 }),
+      }
+    end
+    local searched = gc.await {
       action = {
         type = "object.interact",
-        id = closed.id,
-        action = "Open",
-        world = closed.world,
+        id = cupboard.id,
+        action = "Search",
+        world = cupboard.world,
         within = 12,
       },
-      breaks = true,
       timeout = { game_ticks = 30 },
     }
-    if opened.status ~= "dispatched" then return opened end
-    for _ = 1, 20 do
+    if searched.status ~= "dispatched" then return searched end
+    for _ = 1, 30 do
       gc.await { event = "game.tick" }
-      cupboard = object(config.objects.glough_cupboard_open, "Search", 12)
-      if cupboard then break end
+      if has_inventory_item(config.items.glough_journal) then
+        return { status = "complete", result = "glough_journal_obtained", receipt = searched }
+      end
     end
-  end
-  if not cupboard then
-    return {
-      status = "glough_cupboard_not_observed",
-      objects = gc.read("objects", { within = 12, limit = 50 }),
-    }
-  end
-  local searched = gc.await {
-    action = {
-      type = "object.interact",
-      id = cupboard.id,
-      action = "Search",
-      world = cupboard.world,
-      within = 12,
-    },
-    breaks = true,
-    timeout = { game_ticks = 30 },
-  }
-  if searched.status ~= "dispatched" then return searched end
-  for _ = 1, 30 do
-    gc.await { event = "game.tick" }
-    if has_inventory_item(config.items.glough_journal) then
-      return { status = "complete", result = "glough_journal_obtained", receipt = searched }
-    end
-  end
-  return { status = "glough_journal_unverified", receipt = searched }
+    return { status = "glough_journal_unverified", receipt = searched }
+  end)
 end
 
 local function talk_glough_again()
-  local started_tick = gc.read("runtime").game_tick
-  local clicked = { status = "dispatched", result = "resumed_open_dialogue" }
-  if not gc.read("dialogue").open then
-    local target = npc(config.npcs.glough, 16, true)
-    if not target then return { status = "glough_not_reachable_for_confrontation" } end
-    clicked = gc.await {
-      action = { type = "npc.interact", id = target.id, action = "Talk-to", within = 16 },
-      breaks = false,
-      timeout = { game_ticks = 40 },
-    }
-    if clicked.status ~= "dispatched" then return clicked end
-  end
-  local finished, failure = finish_dialogue(
-    function()
-      local world = gc.read("player").world
-      return world.plane == 3 and world.x == 2464 and world.y == 3496
-    end,
-    {},
-    started_tick)
-  if not finished then return failure end
-  return { status = "complete", result = "glough_confrontation_verified", receipt = clicked }
+  return gc.intent("grand_tree.talk_glough_again", function()
+    local started_tick = gc.read("runtime").game_tick
+    local clicked = { status = "dispatched", result = "resumed_open_dialogue" }
+    if not gc.read("dialogue").open then
+      local target = npc(config.npcs.glough, 16, true)
+      if not target then return { status = "glough_not_reachable_for_confrontation" } end
+      clicked = gc.await {
+        action = { type = "npc.interact", id = target.id, action = "Talk-to", within = 16 },
+        timeout = { game_ticks = 40 },
+      }
+      if clicked.status ~= "dispatched" then return clicked end
+    end
+    local finished, failure = finish_dialogue(
+      function()
+        local world = gc.read("player").world
+        return world.plane == 3 and world.x == 2464 and world.y == 3496
+      end,
+      {},
+      started_tick)
+    if not finished then return failure end
+    return { status = "complete", result = "glough_confrontation_verified", receipt = clicked }
+  end)
 end
 
 local function talk_charlie_from_cell()
-  local started_tick = gc.read("runtime").game_tick
-  local clicked = { status = "dispatched", result = "resumed_open_dialogue" }
-  if not gc.read("dialogue").open then
-    local target = npc(config.npcs.charlie, 10, true)
-    if not target then return { status = "charlie_not_reachable_from_cell" } end
-    clicked = gc.await {
-      action = { type = "npc.interact", id = target.id, action = "Talk-to", within = 10 },
-      breaks = false,
-      timeout = { game_ticks = 40 },
-    }
-    if clicked.status ~= "dispatched" then return clicked end
-  end
-  local finished, failure = finish_dialogue(
-    function()
-      local world = gc.read("player").world
-      return not (world.plane == 3 and world.x == 2464 and world.y == 3496)
-    end,
-    {},
-    started_tick)
-  if not finished then return failure end
-  return { status = "complete", result = "charlie_cell_dialogue_verified", receipt = clicked }
+  return gc.intent("grand_tree.talk_charlie_from_cell", function()
+    local started_tick = gc.read("runtime").game_tick
+    local clicked = { status = "dispatched", result = "resumed_open_dialogue" }
+    if not gc.read("dialogue").open then
+      local target = npc(config.npcs.charlie, 10, true)
+      if not target then return { status = "charlie_not_reachable_from_cell" } end
+      clicked = gc.await {
+        action = { type = "npc.interact", id = target.id, action = "Talk-to", within = 10 },
+        timeout = { game_ticks = 40 },
+      }
+      if clicked.status ~= "dispatched" then return clicked end
+    end
+    local finished, failure = finish_dialogue(
+      function()
+        local world = gc.read("player").world
+        return not (world.plane == 3 and world.x == 2464 and world.y == 3496)
+      end,
+      {},
+      started_tick)
+    if not finished then return failure end
+    return { status = "complete", result = "charlie_cell_dialogue_verified", receipt = clicked }
+  end)
 end
 
 local function take_glider_to_karamja()
   local target = npc(config.npcs.captain_errdo, 12, true)
   if not target then return { status = "captain_errdo_not_reachable" } end
-  local started_tick = gc.read("runtime").game_tick
-  local clicked = gc.await {
-    action = { type = "npc.interact", id = target.id, action = "Talk-to", within = 12 },
-    breaks = true,
-    timeout = { game_ticks = 40 },
-  }
-  if clicked.status ~= "dispatched" then return clicked end
-  local finished, failure = finish_dialogue(
-    function()
-      local world = gc.read("player").world
-      return world.plane == 0 and world.x >= 2900 and world.x <= 3010 and
-        world.y >= 2950 and world.y <= 3070
-    end,
-    { "Take me to Karamja please!" },
-    started_tick)
-  if not finished then return failure end
-  return { status = "complete", result = "karamja_glider_verified", receipt = clicked }
+  return gc.intent("grand_tree.take_glider_to_karamja", function()
+    local started_tick = gc.read("runtime").game_tick
+    local clicked = gc.await {
+      action = { type = "npc.interact", id = target.id, action = "Talk-to", within = 12 },
+      timeout = { game_ticks = 40 },
+    }
+    if clicked.status ~= "dispatched" then return clicked end
+    local finished, failure = finish_dialogue(
+      function()
+        local world = gc.read("player").world
+        return world.plane == 0 and world.x >= 2900 and world.x <= 3010 and
+          world.y >= 2950 and world.y <= 3070
+      end,
+      { "Take me to Karamja please!" },
+      started_tick)
+    if not finished then return failure end
+    return { status = "complete", result = "karamja_glider_verified", receipt = clicked }
+  end)
 end
 
 local function in_shipyard()
@@ -606,81 +446,84 @@ local function enter_shipyard()
       objects = gc.read("objects", { within = 12, limit = 40 }),
     }
   end
-  local started_tick = gc.read("runtime").game_tick
-  local clicked = gc.await {
-    action = {
-      type = "object.interact",
-      id = gate.id,
-      action = "Open",
-      world = gate.world,
-      within = 12,
-    },
-    breaks = true,
-    timeout = { game_ticks = 40 },
-  }
-  if clicked.status ~= "dispatched" then return clicked end
-  local finished, failure = finish_dialogue(
-    in_shipyard,
-    { "Glough sent me.", "Ka.", "Lu.", "Min." },
-    started_tick)
-  if not finished then return failure end
-  return { status = "complete", result = "shipyard_entry_verified", receipt = clicked }
+  return gc.intent("grand_tree.enter_shipyard", function()
+    local started_tick = gc.read("runtime").game_tick
+    local clicked = gc.await {
+      action = {
+        type = "object.interact",
+        id = gate.id,
+        action = "Open",
+        world = gate.world,
+        within = 12,
+      },
+      timeout = { game_ticks = 40 },
+    }
+    if clicked.status ~= "dispatched" then return clicked end
+    local finished, failure = finish_dialogue(
+      in_shipyard,
+      { "Glough sent me.", "Ka.", "Lu.", "Min." },
+      started_tick)
+    if not finished then return failure end
+    return { status = "complete", result = "shipyard_entry_verified", receipt = clicked }
+  end)
 end
 
 local function talk_shipyard_foreman()
   if has_inventory_item(config.items.lumber_order) then
     return { status = "complete", result = "lumber_order_already_owned" }
   end
-  local started_tick = gc.read("runtime").game_tick
-  local clicked = { status = "dispatched", result = "resumed_open_dialogue" }
-  if not gc.read("dialogue").open then
-    local target = npc(config.npcs.shipyard_foreman, 20, true)
-    if not target then
-      return {
-        status = "shipyard_foreman_not_reachable",
-        nearby = gc.read("npcs", { within = 20, limit = 30 }),
+  return gc.intent("grand_tree.talk_shipyard_foreman", function()
+    local started_tick = gc.read("runtime").game_tick
+    local clicked = { status = "dispatched", result = "resumed_open_dialogue" }
+    if not gc.read("dialogue").open then
+      local target = npc(config.npcs.shipyard_foreman, 20, true)
+      if not target then
+        return {
+          status = "shipyard_foreman_not_reachable",
+          nearby = gc.read("npcs", { within = 20, limit = 30 }),
+        }
+      end
+      clicked = gc.await {
+        action = { type = "npc.interact", id = target.id, action = "Talk-to", within = 20 },
+        timeout = { game_ticks = 40 },
       }
+      if clicked.status ~= "dispatched" then return clicked end
     end
-    clicked = gc.await {
-      action = { type = "npc.interact", id = target.id, action = "Talk-to", within = 20 },
-      breaks = false,
-      timeout = { game_ticks = 40 },
-    }
-    if clicked.status ~= "dispatched" then return clicked end
-  end
-  local finished, failure = finish_dialogue(
-    function()
-      local vars = gc.read("vars", { varps = { config.varp } })
-      return vars.varps[config.varp] >= 90 or has_inventory_item(config.items.lumber_order)
-    end,
-    { "Sadly his wife is no longer with us!", "He loves worm holes.", "Anita." },
-    started_tick)
-  if not finished then return failure end
-  return { status = "complete", result = "lumber_order_obtained", receipt = clicked }
+    local finished, failure = finish_dialogue(
+      function()
+        local vars = gc.read("vars", { varps = { config.varp } })
+        return vars.varps[config.varp] >= 90 or has_inventory_item(config.items.lumber_order)
+      end,
+      { "Sadly his wife is no longer with us!", "He loves worm holes.", "Anita." },
+      started_tick)
+    if not finished then return failure end
+    return { status = "complete", result = "lumber_order_obtained", receipt = clicked }
+  end)
 end
 
 local function return_lumber_order_to_charlie()
-  local started_tick = gc.read("runtime").game_tick
-  local clicked = { status = "dispatched", result = "resumed_open_dialogue" }
-  if not gc.read("dialogue").open then
-    local target = npc(config.npcs.charlie, 20, true)
-    if not target then return { status = "charlie_not_reachable_for_lumber_order" } end
-    clicked = gc.await {
-      action = { type = "npc.interact", id = target.id, action = "Talk-to", within = 20 },
-      breaks = false,
-      timeout = { game_ticks = 40 },
-    }
-    if clicked.status ~= "dispatched" then return clicked end
-  end
-  local finished, failure = finish_dialogue(
-    function()
-      local vars = gc.read("vars", { varps = { config.varp } })
-      return vars.varps[config.varp] >= 100
-    end,
-    {},
-    started_tick)
-  if not finished then return failure end
-  return { status = "complete", result = "lumber_order_returned", receipt = clicked }
+  return gc.intent("grand_tree.return_lumber_order_to_charlie", function()
+    local started_tick = gc.read("runtime").game_tick
+    local clicked = { status = "dispatched", result = "resumed_open_dialogue" }
+    if not gc.read("dialogue").open then
+      local target = npc(config.npcs.charlie, 20, true)
+      if not target then return { status = "charlie_not_reachable_for_lumber_order" } end
+      clicked = gc.await {
+        action = { type = "npc.interact", id = target.id, action = "Talk-to", within = 20 },
+        timeout = { game_ticks = 40 },
+      }
+      if clicked.status ~= "dispatched" then return clicked end
+    end
+    local finished, failure = finish_dialogue(
+      function()
+        local vars = gc.read("vars", { varps = { config.varp } })
+        return vars.varps[config.varp] >= 100
+      end,
+      {},
+      started_tick)
+    if not finished then return failure end
+    return { status = "complete", result = "lumber_order_returned", receipt = clicked }
+  end)
 end
 
 local function enter_stronghold_with_femi()
@@ -692,7 +535,6 @@ local function enter_stronghold_with_femi()
     if dialogue.type == "continue" then
       local receipt = gc.await {
         action = { type = "dialogue.continue" },
-        breaks = false,
         timeout = { game_ticks = 20 },
       }
       if receipt.status ~= "dispatched" then return receipt end
@@ -708,51 +550,20 @@ local function enter_stronghold_with_femi()
   if not target then
     return { status = "femi_not_reachable", nearby = gc.read("npcs", { within = 15, limit = 30 }) }
   end
-  local started_tick = gc.read("runtime").game_tick
-  local talked = gc.await {
-    action = { type = "npc.interact", id = target.id, action = "Talk-to", within = 12 },
-    breaks = false,
-    timeout = { game_ticks = 30 },
-  }
-  if talked.status ~= "dispatched" then return talked end
-  local finished, failure = finish_dialogue(
-    function() return gc.read("player").world.y >= 3384 end,
-    {},
-    started_tick)
-  if not finished then return failure end
-  return { status = "complete", result = "stronghold_femi_entry_verified", receipt = talked }
-end
-
-local function climb_anita_stairs()
-  local world = gc.read("player").world
-  if world.plane == 1 and math.max(
-    math.abs(world.x - config.points.anita_upstairs.x),
-    math.abs(world.y - config.points.anita_upstairs.y)) <= 12 then
-    return { status = "complete", result = "anita_stairs_already_climbed" }
-  end
-  local stairs = object(config.objects.anita_stairs, "Climb-up", 12)
-  if not stairs then
-    return { status = "anita_stairs_not_observed", objects = gc.read("objects", { within = 12, limit = 40 }) }
-  end
-  local climbed = gc.await {
-    action = {
-      type = "object.interact",
-      id = stairs.id,
-      action = "Climb-up",
-      world = stairs.world,
-      within = 12,
-    },
-    breaks = true,
-    timeout = { game_ticks = 30 },
-  }
-  if climbed.status ~= "dispatched" then return climbed end
-  for _ = 1, 30 do
-    gc.await { event = "game.tick" }
-    if gc.read("player").world.plane == 1 then
-      return { status = "complete", result = "anita_stairs_climbed", receipt = climbed }
-    end
-  end
-  return { status = "anita_stairs_unverified", receipt = climbed }
+  return gc.intent("grand_tree.enter_stronghold_with_femi", function()
+    local started_tick = gc.read("runtime").game_tick
+    local talked = gc.await {
+      action = { type = "npc.interact", id = target.id, action = "Talk-to", within = 12 },
+      timeout = { game_ticks = 30 },
+    }
+    if talked.status ~= "dispatched" then return talked end
+    local finished, failure = finish_dialogue(
+      function() return gc.read("player").world.y >= 3384 end,
+      {},
+      started_tick)
+    if not finished then return failure end
+    return { status = "complete", result = "stronghold_femi_entry_verified", receipt = talked }
+  end)
 end
 
 local function talk_anita()
@@ -761,130 +572,102 @@ local function talk_anita()
   end
   local target = npc(config.npcs.anita, 20, true)
   if not target then return { status = "anita_not_reachable" } end
-  local started_tick = gc.read("runtime").game_tick
-  local talked = gc.await {
-    action = { type = "npc.interact", id = target.id, action = "Talk-to", within = 20 },
-    breaks = false,
-    timeout = { game_ticks = 30 },
-  }
-  if talked.status ~= "dispatched" then return talked end
-  local finished, failure = finish_dialogue(
-    function() return has_inventory_item(config.items.glough_key) end,
-    { "I suppose so." },
-    started_tick)
-  if not finished then return failure end
-  return { status = "complete", result = "glough_key_obtained", receipt = talked }
-end
-
-local function descend_anita_stairs()
-  if gc.read("player").world.plane == 0 then
-    return { status = "complete", result = "anita_stairs_already_descended" }
-  end
-  local stairs = object(config.objects.anita_stairs_down, "Climb-down", 12)
-  if not stairs then
-    return { status = "anita_descent_not_observed", objects = gc.read("objects", { within = 12, limit = 40 }) }
-  end
-  local descended = gc.await {
-    action = {
-      type = "object.interact",
-      id = stairs.id,
-      action = "Climb-down",
-      world = stairs.world,
-      within = 12,
-    },
-    breaks = true,
-    timeout = { game_ticks = 30 },
-  }
-  if descended.status ~= "dispatched" then return descended end
-  for _ = 1, 30 do
-    gc.await { event = "game.tick" }
-    if gc.read("player").world.plane == 0 then
-      return { status = "complete", result = "anita_stairs_descended", receipt = descended }
-    end
-  end
-  return { status = "anita_descent_unverified", receipt = descended }
+  return gc.intent("grand_tree.talk_anita", function()
+    local started_tick = gc.read("runtime").game_tick
+    local talked = gc.await {
+      action = { type = "npc.interact", id = target.id, action = "Talk-to", within = 20 },
+      timeout = { game_ticks = 30 },
+    }
+    if talked.status ~= "dispatched" then return talked end
+    local finished, failure = finish_dialogue(
+      function() return has_inventory_item(config.items.glough_key) end,
+      { "I suppose so." },
+      started_tick)
+    if not finished then return failure end
+    return { status = "complete", result = "glough_key_obtained", receipt = talked }
+  end)
 end
 
 local function obtain_invasion_plans()
   if has_inventory_item(config.items.invasion_plans) then
     return { status = "complete", result = "invasion_plans_already_owned" }
   end
-  if gc.read("dialogue").type == "continue" then
-    local continued = gc.await {
-      action = { type = "dialogue.continue" },
-      breaks = false,
-      timeout = { game_ticks = 20 },
-    }
-    if continued.status ~= "dispatched" then return continued end
-    gc.await { event = "game.tick" }
-  end
-  local chest = object(config.objects.invasion_chest_closed, "Open", 12)
-  local open_chest = object(config.objects.invasion_chest_open, "Search", 12)
-  if chest then
-    local opened = gc.await {
+  return gc.intent("grand_tree.obtain_invasion_plans", function()
+    if gc.read("dialogue").type == "continue" then
+      local continued = gc.await {
+        action = { type = "dialogue.continue" },
+        timeout = { game_ticks = 20 },
+      }
+      if continued.status ~= "dispatched" then return continued end
+      gc.await { event = "game.tick" }
+    end
+    local chest = object(config.objects.invasion_chest_closed, "Open", 12)
+    local open_chest = object(config.objects.invasion_chest_open, "Search", 12)
+    if chest then
+      local opened = gc.await {
+        action = {
+          type = "item.use_on_object",
+          item_id = config.items.glough_key,
+          object_id = chest.id,
+          world = chest.world,
+          within = 12,
+        },
+        timeout = { game_ticks = 30 },
+      }
+      if opened.status ~= "dispatched" then return opened end
+      for _ = 1, 20 do
+        gc.await { event = "game.tick" }
+        if has_inventory_item(config.items.invasion_plans) then
+          return { status = "complete", result = "invasion_plans_obtained", receipt = opened }
+        end
+        open_chest = object(config.objects.invasion_chest_open, "Search", 12)
+        if open_chest then break end
+      end
+    end
+    if not open_chest then
+      return { status = "invasion_chest_not_observed", objects = gc.read("objects", { within = 12, limit = 50 }) }
+    end
+    local searched = gc.await {
       action = {
-        type = "item.use_on_object",
-        item_id = config.items.glough_key,
-        object_id = chest.id,
-        world = chest.world,
+        type = "object.interact",
+        id = open_chest.id,
+        action = "Search",
+        world = open_chest.world,
         within = 12,
       },
-      breaks = true,
       timeout = { game_ticks = 30 },
     }
-    if opened.status ~= "dispatched" then return opened end
-    for _ = 1, 20 do
+    if searched.status ~= "dispatched" then return searched end
+    for _ = 1, 30 do
       gc.await { event = "game.tick" }
       if has_inventory_item(config.items.invasion_plans) then
-        return { status = "complete", result = "invasion_plans_obtained", receipt = opened }
+        return { status = "complete", result = "invasion_plans_obtained", receipt = searched }
       end
-      open_chest = object(config.objects.invasion_chest_open, "Search", 12)
-      if open_chest then break end
     end
-  end
-  if not open_chest then
-    return { status = "invasion_chest_not_observed", objects = gc.read("objects", { within = 12, limit = 50 }) }
-  end
-  local searched = gc.await {
-    action = {
-      type = "object.interact",
-      id = open_chest.id,
-      action = "Search",
-      world = open_chest.world,
-      within = 12,
-    },
-    breaks = true,
-    timeout = { game_ticks = 30 },
-  }
-  if searched.status ~= "dispatched" then return searched end
-  for _ = 1, 30 do
-    gc.await { event = "game.tick" }
-    if has_inventory_item(config.items.invasion_plans) then
-      return { status = "complete", result = "invasion_plans_obtained", receipt = searched }
-    end
-  end
-  return { status = "invasion_plans_unverified", receipt = searched }
+    return { status = "invasion_plans_unverified", receipt = searched }
+  end)
 end
 
 local function return_invasion_plans_to_narnode()
   local target = npc(config.npcs.king_narnode, 20, true)
   if not target then return { status = "king_narnode_not_reachable_with_plans" } end
-  local started_tick = gc.read("runtime").game_tick
-  local talked = gc.await {
-    action = { type = "npc.interact", id = target.id, action = "Talk-to", within = 20 },
-    breaks = false,
-    timeout = { game_ticks = 40 },
-  }
-  if talked.status ~= "dispatched" then return talked end
-  local finished, failure = finish_dialogue(
-    function()
-      local vars = gc.read("vars", { varps = { config.varp } })
-      return vars.varps[config.varp] >= 120
-    end,
-    {},
-    started_tick)
-  if not finished then return failure end
-  return { status = "complete", result = "invasion_plans_returned", receipt = talked }
+  return gc.intent("grand_tree.return_invasion_plans_to_narnode", function()
+    local started_tick = gc.read("runtime").game_tick
+    local talked = gc.await {
+      action = { type = "npc.interact", id = target.id, action = "Talk-to", within = 20 },
+      timeout = { game_ticks = 40 },
+    }
+    if talked.status ~= "dispatched" then return talked end
+    local finished, failure = finish_dialogue(
+      function()
+        local vars = gc.read("vars", { varps = { config.varp } })
+        return vars.varps[config.varp] >= 120
+      end,
+      {},
+      started_tick)
+    if not finished then return failure end
+    return { status = "complete", result = "invasion_plans_returned", receipt = talked }
+  end)
 end
 
 local function climb_glough_watchtower()
@@ -903,7 +686,6 @@ local function climb_glough_watchtower()
       world = tree.world,
       within = 12,
     },
-    breaks = true,
     timeout = { game_ticks = 30 },
   }
   if climbed.status ~= "dispatched" then return climbed end
@@ -924,63 +706,59 @@ local TUZO = {
 }
 
 local function place_tuzo_twigs()
-  local receipts = {}
-  for _, step in ipairs(TUZO) do
-    if has_inventory_item(step.item) then
-      local pillar = object(step.object, nil, 16)
-      if not pillar then
-        return {
-          status = "tuzo_pillar_not_observed",
-          letter = step.letter,
-          objects = gc.read("objects", { within = 16, limit = 60 }),
+  return gc.intent("grand_tree.place_tuzo_twigs", function()
+    local receipts = {}
+    for _, step in ipairs(TUZO) do
+      if has_inventory_item(step.item) then
+        local pillar = object(step.object, nil, 16)
+        if not pillar then
+          return {
+            status = "tuzo_pillar_not_observed",
+            letter = step.letter,
+            objects = gc.read("objects", { within = 16, limit = 60 }),
+          }
+        end
+        local used = gc.await {
+          action = {
+            type = "item.use_on_object",
+            item_id = step.item,
+            object_id = pillar.id,
+            world = pillar.world,
+            within = 16,
+          },
+          timeout = { game_ticks = 30 },
         }
-      end
-      local used = gc.await {
-        action = {
-          type = "item.use_on_object",
-          item_id = step.item,
-          object_id = pillar.id,
-          world = pillar.world,
-          within = 16,
-        },
-        breaks = true,
-        timeout = { game_ticks = 30 },
-      }
-      if used.status ~= "dispatched" then return used end
-      receipts[#receipts + 1] = { letter = step.letter, receipt = used }
-      local consumed = false
-      for _ = 1, 20 do
-        gc.await { event = "game.tick" }
-        if not has_inventory_item(step.item) then consumed = true break end
-      end
-      if not consumed then
-        return { status = "tuzo_twig_not_consumed", letter = step.letter, receipt = used }
+        if used.status ~= "dispatched" then return used end
+        receipts[#receipts + 1] = { letter = step.letter, receipt = used }
+        local consumed = false
+        for _ = 1, 20 do
+          gc.await { event = "game.tick" }
+          if not has_inventory_item(step.item) then consumed = true break end
+        end
+        if not consumed then
+          return { status = "tuzo_twig_not_consumed", letter = step.letter, receipt = used }
+        end
       end
     end
-  end
-  for _ = 1, 30 do
-    local vars = gc.read("vars", { varps = { config.varp } })
-    if vars.varps[config.varp] >= 130 then
-      return { status = "complete", result = "tuzo_twigs_placed", receipts = receipts }
+    for _ = 1, 30 do
+      local vars = gc.read("vars", { varps = { config.varp } })
+      if vars.varps[config.varp] >= 130 then
+        return { status = "complete", result = "tuzo_twigs_placed", receipts = receipts }
+      end
+      gc.await { event = "game.tick" }
     end
-    gc.await { event = "game.tick" }
-  end
-  return { status = "tuzo_completion_unverified", receipts = receipts }
+    return { status = "tuzo_completion_unverified", receipts = receipts }
+  end)
 end
 
 return {
   npc = npc,
   talk_narnode = talk_narnode,
-  climb_hazelmere = climb_hazelmere,
   talk_hazelmere = talk_hazelmere,
   talk_narnode_translation = talk_narnode_translation,
-  climb_glough = climb_glough,
   talk_glough = talk_glough,
-  descend_glough = descend_glough,
   talk_narnode_after_glough = talk_narnode_after_glough,
-  climb_grand_tree_top = climb_grand_tree_top,
   talk_charlie = talk_charlie,
-  descend_grand_tree_bottom = descend_grand_tree_bottom,
   search_glough_cupboard = search_glough_cupboard,
   talk_glough_again = talk_glough_again,
   talk_charlie_from_cell = talk_charlie_from_cell,
@@ -989,9 +767,7 @@ return {
   talk_shipyard_foreman = talk_shipyard_foreman,
   return_lumber_order_to_charlie = return_lumber_order_to_charlie,
   enter_stronghold_with_femi = enter_stronghold_with_femi,
-  climb_anita_stairs = climb_anita_stairs,
   talk_anita = talk_anita,
-  descend_anita_stairs = descend_anita_stairs,
   obtain_invasion_plans = obtain_invasion_plans,
   return_invasion_plans_to_narnode = return_invasion_plans_to_narnode,
   drain_continue_dialogue = drain_continue_dialogue,

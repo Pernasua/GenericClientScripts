@@ -1,4 +1,5 @@
 local config = gc.require("tree_gnome_config")
+local movement = gc.require("shared_movement")
 local interact = gc.require("tree_gnome_interactions")
 local navigation = gc.require("tree_gnome_navigation")
 local combat = gc.require("tree_gnome_combat")
@@ -12,8 +13,7 @@ local function talk_bolren(choices, predicate)
     config.npcs.king_bolren,
     config.points.king_bolren,
     predicate,
-    choices,
-    true)
+    choices)
 end
 
 local function accept_quest()
@@ -29,8 +29,7 @@ local function talk_montai(choices, target_varp)
     config.npcs.commander_montai,
     config.points.commander_montai,
     function() return interact.varp() >= target_varp end,
-    choices,
-    true)
+    choices)
 end
 
 local function tracker(id, point, varbit)
@@ -38,12 +37,11 @@ local function tracker(id, point, varbit)
     id,
     point,
     function() return interact.varbit(varbit) > 0 end,
-    {},
-    true)
+    {})
 end
 
 local function fire_ballista()
-  local near = interact.approach(config.points.ballista, 3, true)
+  local near = movement.approach(config.points.ballista, 3)
   if near.status ~= "arrived" then return near end
   local target = interact.object(config.objects.ballista, "Fire", 16)
   if not target then
@@ -53,38 +51,38 @@ local function fire_ballista()
       nearby = gc.read("objects", { within = 16, limit = 30 }),
     }
   end
-  local coordinate = string.format("%04d", interact.varbit(config.varbits.ballista) + 1)
-  local fired = gc.await {
-    action = {
-      type = "object.interact",
-      id = config.objects.ballista,
-      action = "Fire",
-      world = target.world,
-      within = 16,
-    },
-    breaks = true,
-    timeout = { game_ticks = 40 },
-  }
-  if fired.status ~= "dispatched" then return fired end
-  local dialogue, failure = interact.finish_dialogue(
-    function() return interact.varp() >= 5 end,
-    { coordinate },
-    true,
-    100)
-  if not dialogue then return failure end
-  return {
-    status = "complete",
-    result = "ballista_hit_verified",
-    coordinate = coordinate,
-    receipt = fired,
-    dialogue = dialogue,
-  }
+  return gc.intent("tree_gnome.fire_ballista", function()
+    local coordinate = string.format("%04d", interact.varbit(config.varbits.ballista) + 1)
+    local fired = gc.await {
+      action = {
+        type = "object.interact",
+        id = config.objects.ballista,
+        action = "Fire",
+        world = target.world,
+        within = 16,
+      },
+      timeout = { game_ticks = 40 },
+    }
+    if fired.status ~= "dispatched" then return fired end
+    local dialogue, failure = interact.finish_dialogue(
+      function() return interact.varp() >= 5 end,
+      { coordinate },
+      100)
+    if not dialogue then return failure end
+    return {
+      status = "complete",
+      result = "ballista_hit_verified",
+      coordinate = coordinate,
+      receipt = fired,
+      dialogue = dialogue,
+    }
+  end)
 end
 
 local function report_ballista()
   local talked = talk_montai({}, 5)
   if talked.status ~= "complete" then return talked end
-  local reached = interact.walk(config.points.crumbled_wall, 8, true, 900)
+  local reached = movement.walk(config.points.crumbled_wall, 8, { ticks = 900 })
   if reached.status ~= "arrived" then return reached end
   gc.await { event = "game.tick" }
   local wall = interact.object(config.objects.crumbled_wall, "Climb-over", 32)

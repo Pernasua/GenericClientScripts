@@ -1,19 +1,9 @@
+local movement = gc.require("shared_movement")
 local config = gc.require("witch_config")
+local geometry = gc.require("shared_geometry")
+local item_queries = gc.require("shared_items")
 
 local experiment = config.experiment
-
-local function in_zone(world, zone)
-  return world and world.plane == zone.plane and world.x >= zone.x1 and world.x <= zone.x2 and
-    world.y >= zone.y1 and world.y <= zone.y2
-end
-
-local function inventory_quantity(id)
-  local total = 0
-  for _, item in ipairs(gc.read("inventory").items) do
-    if item.id == id then total = total + item.quantity end
-  end
-  return total
-end
 
 local function npc(id)
   return gc.read("npcs", { id = id, within = 12, limit = 1 })[1]
@@ -27,19 +17,11 @@ local function current_form()
   return nil, nil
 end
 
-local function walk(world, timeout)
-  return gc.await {
-    action = { type = "walk.to", destination = world, within = 0 },
-    breaks = false,
-    timeout = { game_ticks = timeout or 60 },
-  }
-end
-
 local function wait_for_shed(expected, ticks)
   for _ = 1, ticks do
     gc.await { event = "game.tick" }
     local player = gc.read("player")
-    if in_zone(player.world, config.zones.shed) == expected then return true end
+    if geometry.in_zone(player.world, config.zones.shed) == expected then return true end
   end
   return false
 end
@@ -60,12 +42,12 @@ local function heal_for_next_lure()
     if player.current_hitpoints >= player.max_hitpoints then
       return true, receipts
     end
-    if inventory_quantity(1993) == 0 then
+    if item_queries.inventory_quantity(1993) == 0 then
       return nil, { status = "combat_food_exhausted", receipts = receipts }
     end
     local receipt = gc.await {
       action = { type = "item.interact", id = 1993, action = "Drink" },
-      breaks = false,
+      policy = { breaks = false, cursor_release = "none", fidget = "none" },
     }
     table.insert(receipts, receipt)
     if receipt.status ~= "dispatched" then
@@ -77,10 +59,10 @@ local function heal_for_next_lure()
 end
 
 local function enter_shed()
-  if in_zone(gc.read("player").world, config.zones.shed) then
+  if geometry.in_zone(gc.read("player").world, config.zones.shed) then
     return { status = "complete", result = "already_in_shed" }
   end
-  if inventory_quantity(2411) == 0 then
+  if item_queries.inventory_quantity(2411) == 0 then
     return { status = "shed_key_missing" }
   end
   local unlock = gc.await {
@@ -91,7 +73,7 @@ local function enter_shed()
       world = experiment.door.world,
       within = 3,
     },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
   }
   if unlock.status ~= "dispatched" then
     return { status = "shed_unlock_failed", receipt = unlock }
@@ -107,13 +89,16 @@ local function enter_shed()
       world = experiment.door.world,
       within = 3,
     },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
   }
   if opened.status ~= "dispatched" then
     return { status = "shed_open_failed", unlock = unlock, receipt = opened }
   end
-  local crossed = walk(experiment.spawn, 30)
-  if crossed.status ~= "arrived" or not in_zone(gc.read("player").world, config.zones.shed) then
+  local crossed = movement.walk(experiment.spawn, 0, {
+    ticks = 30,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
+  })
+  if crossed.status ~= "arrived" or not geometry.in_zone(gc.read("player").world, config.zones.shed) then
     return { status = "shed_entry_unverified", unlock = unlock, open = opened, walk = crossed }
   end
   return { status = "complete", result = "shed_entered", unlock = unlock, open = opened, walk = crossed }
@@ -129,7 +114,7 @@ local function ensure_first_form()
       world = experiment.ball.world,
       within = 10,
     },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
   }
   if attempt.status ~= "dispatched" then
     return nil, { status = "experiment_spawn_failed", receipt = attempt }
@@ -238,7 +223,7 @@ local function attack_stable(id)
         action = "Attack",
         within = 12,
       },
-      breaks = false,
+      policy = { breaks = false, cursor_release = "none", fidget = "none" },
       timeout = { game_ticks = 40 },
     }
     if receipt.status == "dispatched" then return receipt end
@@ -251,7 +236,7 @@ local function dismiss_open_dialogue()
   if dialogue.type ~= "continue" then return false end
   local continued = gc.await {
     action = { type = "dialogue.continue" },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
     timeout = { game_ticks = 20 },
   }
   if continued.status ~= "dispatched" then return nil, continued end
@@ -280,7 +265,10 @@ local function establish_north_safespot(form_index)
     if dismissed == nil then
       return nil, { status = "combat_dialogue_failed", receipt = dialogue_failure }
     end
-    local start = walk(experiment.first_form_start, 40)
+    local start = movement.walk(experiment.first_form_start, 0, {
+      ticks = 40,
+      policy = { breaks = false, cursor_release = "none", fidget = "none" },
+    })
     if start.status ~= "arrived" then
       return nil, { status = "north_start_failed", cycle = cycle, receipt = start }
     end
@@ -300,7 +288,10 @@ local function establish_north_safespot(form_index)
     if approach ~= "arrived" then
       return nil, { status = "north_approach_failed", cycle = cycle }
     end
-    local under = walk(experiment.first_form_walk, 20)
+    local under = movement.walk(experiment.first_form_walk, 0, {
+      ticks = 20,
+      policy = { breaks = false, cursor_release = "none", fidget = "none" },
+    })
     if under.status ~= "arrived" then
       return nil, { status = "north_walk_under_failed", cycle = cycle, receipt = under }
     end
@@ -315,7 +306,10 @@ local function establish_north_safespot(form_index)
       return { status = "transitioned", cycles = cycles }
     end
     if displacement == "complete" then
-      local diagonal = walk(experiment.first_form_safe, 20)
+      local diagonal = movement.walk(experiment.first_form_safe, 0, {
+        ticks = 20,
+        policy = { breaks = false, cursor_release = "none", fidget = "none" },
+      })
       if diagonal.status ~= "arrived" then
         return nil, { status = "north_safe_walk_failed", receipt = diagonal, cycles = cycles }
       end
@@ -368,7 +362,7 @@ local function defeat_form(form_index, safe_world, ticks)
     end
     local player = gc.read("player")
     minimum_hp = math.min(minimum_hp, player.current_hitpoints)
-    if not in_zone(player.world, config.zones.shed) then
+    if not geometry.in_zone(player.world, config.zones.shed) then
       return nil, { status = "form_left_shed", form = form_index, player = player }
     end
     if player.world.x ~= safe_world.x or player.world.y ~= safe_world.y then
@@ -379,7 +373,10 @@ local function defeat_form(form_index, safe_world, ticks)
 end
 
 local function establish_south_safespot(expected_id)
-  local moved = walk(experiment.south_safespot, 30)
+  local moved = movement.walk(experiment.south_safespot, 0, {
+    ticks = 30,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
+  })
   if moved.status ~= "arrived" then
     return nil, { status = "south_safe_walk_failed", receipt = moved }
   end
@@ -437,7 +434,7 @@ local function run_all_forms()
   local fight, fight_failure = defeat_form(4, experiment.south_safespot, 720)
   if not fight then return fight_failure end
   receipts.form_4_fight = fight
-  gc.await { action = { type = "mouse.offscreen" }, breaks = false }
+  gc.await { action = { type = "mouse.offscreen" }, policy = { breaks = false, cursor_release = "none", fidget = "none" } }
   return {
     status = "experiment_complete",
     varp = gc.read("vars", { varps = { 226 } }).varps[226],

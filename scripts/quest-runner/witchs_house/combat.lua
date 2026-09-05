@@ -1,21 +1,10 @@
 local config = gc.require("witch_config")
+local equipment_actions = gc.require("shared_equipment")
+local item_queries = gc.require("shared_items")
 local experiment = gc.require("witch_experiment")
 local garden = gc.require("witch_garden")
 local preparation = gc.require("shared_preparation")
 local travel = gc.require("shared_travel")
-
-local function quantity(container, id)
-  if not container or not container.items then return 0 end
-  local total = 0
-  for _, item in ipairs(container.items) do
-    if item.id == id then total = total + item.quantity end
-  end
-  return total
-end
-
-local function carried(id)
-  return quantity(gc.read("inventory"), id) + quantity(gc.read("equipment"), id)
-end
 
 local function in_shed()
   local world = gc.read("player").world
@@ -37,13 +26,13 @@ local function preflight()
   if skills.magic.level < 13 then table.insert(missing, "Magic 13") end
   if player.max_hitpoints < 12 then table.insert(missing, "12 Hitpoints") end
   if player.current_hitpoints < player.max_hitpoints then table.insert(missing, "full Hitpoints") end
-  if carried(1387) < 1 then table.insert(missing, "staff of fire") end
-  if carried(556) < 300 then table.insert(missing, "300 air runes") end
-  if carried(558) < 150 then table.insert(missing, "150 mind runes") end
-  if carried(2550) < 4 then table.insert(missing, "four rings of recoil") end
-  if carried(1993) * 11 < 60 then table.insert(missing, "60 Hitpoints of food") end
-  if carried(2409) < 1 then table.insert(missing, "door key") end
-  if carried(2411) < 1 then table.insert(missing, "shed key") end
+  if item_queries.carried_quantity(1387) < 1 then table.insert(missing, "staff of fire") end
+  if item_queries.carried_quantity(556) < 300 then table.insert(missing, "300 air runes") end
+  if item_queries.carried_quantity(558) < 150 then table.insert(missing, "150 mind runes") end
+  if item_queries.carried_quantity(2550) < 4 then table.insert(missing, "four rings of recoil") end
+  if item_queries.carried_quantity(1993) * 11 < 60 then table.insert(missing, "60 Hitpoints of food") end
+  if item_queries.carried_quantity(2409) < 1 then table.insert(missing, "door key") end
+  if item_queries.carried_quantity(2411) < 1 then table.insert(missing, "shed key") end
   if not travel.has_necklace() then table.insert(missing, "charged games necklace") end
   if #missing > 0 then
     return nil, { status = "experiment_preflight_failed", missing = missing, player = player }
@@ -51,33 +40,14 @@ local function preflight()
   return true
 end
 
-local function equip(id, action, label)
-  if quantity(gc.read("equipment"), id) > 0 then return true end
-  if quantity(gc.read("inventory"), id) == 0 then
-    return nil, { status = "experiment_equip_missing", item = label }
-  end
-  local receipt = gc.await {
-    action = { type = "item.interact", id = id, action = action },
-    breaks = false,
-  }
-  if receipt.status ~= "dispatched" then
-    return nil, { status = "experiment_equip_failed", item = label, receipt = receipt }
-  end
-  for _ = 1, 6 do
-    gc.await { event = "game.tick" }
-    if quantity(gc.read("equipment"), id) > 0 then return true end
-  end
-  return nil, { status = "experiment_equip_unverified", item = label, receipt = receipt }
-end
-
 local function setup()
-  local ok, failure = equip(1387, "Wield", "Staff of fire")
-  if not ok then return nil, failure end
-  ok, failure = equip(2550, "Wear", "Ring of recoil")
-  if not ok then return nil, failure end
+  local staff = equipment_actions.equip(1387, "Wield", { verify_ticks = 6 })
+  if staff.status ~= "complete" and staff.status ~= "unchanged" then return nil, staff end
+  local recoil = equipment_actions.equip(2550, "Wear", { verify_ticks = 6 })
+  if recoil.status ~= "complete" and recoil.status ~= "unchanged" then return nil, recoil end
   local autocast = gc.await {
     action = { type = "combat.set_autocast", spell = "Fire Strike" },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
     timeout = { game_ticks = 30 },
   }
   if autocast.status ~= "set" and autocast.status ~= "unchanged" then
@@ -96,7 +66,7 @@ local function setup()
         within = 0,
       },
     },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
   }
   if safety.status ~= "complete" then
     return nil, { status = "experiment_safety_failed", receipt = safety }
@@ -111,7 +81,7 @@ local function prepare(restock)
   end
   local loadout = {}
   for _, item in ipairs(config.combat_loadout) do table.insert(loadout, item) end
-  local shed_keys = carried(2411) + quantity(gc.read("bank"), 2411)
+  local shed_keys = item_queries.carried_quantity(2411) + item_queries.quantity(gc.read("bank"), 2411)
   if shed_keys > 0 then
     table.insert(loadout, { id = 2411, name = "Key", quantity = 1, purchase = false })
   end

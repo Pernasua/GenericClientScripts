@@ -1,5 +1,8 @@
 -- genericclient-interface: 2
 
+local geometry = gc.require("shared_geometry")
+local behaviors = gc.require("shared_behaviors")
+
 local targets = {
   ["2"] = 83,
   ["5"] = 388,
@@ -33,13 +36,6 @@ local methods = {
   },
 }
 
-local function distance(a, b)
-  if a.plane ~= b.plane then
-    return 99999
-  end
-  return math.max(math.abs(a.x - b.x), math.abs(a.y - b.y))
-end
-
 local function overlay(skill, level, target, method, state)
   gc.overlay {
     { label = skill.label, value = tostring(level) .. " / " .. tostring(target) },
@@ -52,12 +48,12 @@ local function leave_combat(reason)
   gc.log("info", "melee-disengage", { reason = reason })
   gc.await {
     action = { type = "walk.random" },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
     timeout = { game_ticks = 12 },
   }
   return gc.await {
     action = { type = "mouse.offscreen" },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
   }
 end
 
@@ -129,15 +125,11 @@ return {
     local start = gc.read("skills")[input.skill]
     local start_xp = start.xp
     overlay(skill, start.level, target_level, method, "Securing combat")
-    local retaliate = gc.await {
-      action = { type = "combat.set_auto_retaliate", enabled = false },
-      breaks = false,
-      timeout = { game_ticks = 20 },
+    local configured, behavior_failure = behaviors.configure {
+      auto_retaliate = false,
+      emergency_escape = true,
     }
-    if retaliate.status ~= "set" and retaliate.status ~= "unchanged" then
-      gc.log("error", "melee-auto-retaliate-failed", retaliate)
-      return { status = "auto_retaliate_failed", receipt = retaliate }
-    end
+    if not configured then return behavior_failure end
 
     if start.level >= target_level or start.xp >= target_xp then
       overlay(skill, start.level, target_level, method, "Target already met")
@@ -153,7 +145,7 @@ return {
     overlay(skill, start.level, target_level, method, "Setting style")
     local style = gc.await {
       action = { type = "combat.set_style", style = skill.style },
-      breaks = false,
+      policy = { breaks = false, cursor_release = "none", fidget = "none" },
       timeout = { game_ticks = 20 },
     }
     if style.status ~= "set" and style.status ~= "unchanged" then
@@ -162,7 +154,7 @@ return {
     end
 
     local player = gc.read("player")
-    if distance(player.world, method.destination) > method.within then
+    if geometry.distance(player.world, method.destination) > method.within then
       overlay(skill, start.level, target_level, method, "Travelling")
       local walk = gc.await {
         action = {
@@ -179,7 +171,7 @@ return {
       gc.phase("melee." .. method_id .. ".arrived")
     end
 
-    gc.activity("combat")
+    gc.activity("combat", { breaks = true })
 
     local stop_requested = false
     local low_hitpoints = false
@@ -224,7 +216,6 @@ return {
           action = "Attack",
           within = method.npc_radius,
         },
-        breaks = false,
         timeout = { game_ticks = 30 },
       }
 

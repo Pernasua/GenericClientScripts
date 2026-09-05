@@ -1,39 +1,9 @@
+local movement = gc.require("shared_movement")
 local config = gc.require("waterfall_config")
+local geometry = gc.require("shared_geometry")
+local item_queries = gc.require("shared_items")
 local travel = gc.require("shared_travel")
-
-local function in_zone(world, zone)
-  return world and world.plane == zone.plane and world.x >= zone.x1 and world.x <= zone.x2 and
-    world.y >= zone.y1 and world.y <= zone.y2
-end
-
-local function quantity(id)
-  local total = 0
-  for _, item in ipairs(gc.read("inventory").items) do
-    if item.id == id then total = total + item.quantity end
-  end
-  return total
-end
-
-local function walk(world, within, ticks, breaks)
-  return gc.await {
-    action = {
-      type = "walk.to",
-      destination = world,
-      within = within or 3,
-      run = true,
-    },
-    breaks = breaks == true,
-    timeout = { game_ticks = ticks or 900 },
-  }
-end
-
-local function wait_for(predicate, ticks)
-  for _ = 1, ticks do
-    gc.await { event = "game.tick" }
-    if predicate() then return true end
-  end
-  return false
-end
+local wait = gc.require("shared_wait")
 
 local function use_pebble()
   local current = gc.read("player").world
@@ -43,7 +13,7 @@ local function use_pebble()
     local teleported = travel.teleport_to_barbarian_outpost()
     if teleported.status ~= "complete" then return teleported end
   end
-  local approach = walk(config.points.tombstone, 3, 900, true)
+  local approach = movement.walk(config.points.tombstone, 3, { ticks = 900 })
   if approach.status ~= "arrived" then return approach end
   gc.await { event = "game.tick" }
   local tombstones = gc.read("objects", {
@@ -66,12 +36,12 @@ local function use_pebble()
       world = tombstones[1].world,
       within = 8,
     },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
     timeout = { game_ticks = 40 },
   }
   if entered.status ~= "dispatched" then return entered end
-  if not wait_for(function()
-    return in_zone(gc.read("player").world, config.zones.glarial_tomb)
+  if not wait.until_true(function()
+    return geometry.in_zone(gc.read("player").world, config.zones.glarial_tomb)
   end, 30) then
     return { status = "timed_out", result = "glarial_tomb_entry_unverified", receipt = entered }
   end
@@ -79,7 +49,10 @@ local function use_pebble()
 end
 
 local function search(object_id, action, world, item_id, result)
-  local approach = walk(world, 3, 300)
+  local approach = movement.walk(world, 3, {
+    ticks = 300,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
+  })
   if approach.status ~= "arrived" then return approach end
   gc.await { event = "game.tick" }
   local objects = gc.read("objects", {
@@ -103,11 +76,11 @@ local function search(object_id, action, world, item_id, result)
       world = objects[1].world,
       within = 8,
     },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
     timeout = { game_ticks = 40 },
   }
   if clicked.status ~= "dispatched" then return clicked end
-  if not wait_for(function() return quantity(item_id) > 0 end, 20) then
+  if not wait.until_true(function() return item_queries.inventory_quantity(item_id) > 0 end, 20) then
     return { status = "timed_out", result = result .. "_unverified", receipt = clicked }
   end
   return { status = "complete", result = result, receipt = clicked }
@@ -130,66 +103,23 @@ local function obtain_amulet()
 end
 
 local function leave()
-  local teleported = travel.teleport_to_barbarian_outpost(false)
+  local teleported = travel.teleport_to_barbarian_outpost({
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
+    keyboard = true,
+  })
   if teleported.status == "complete" then
     return { status = "complete", result = "glarial_tomb_left", teleport = teleported }
   end
-  local approach = walk(config.points.tomb_exit, 4, 300)
-  if approach.status ~= "arrived" then
-    approach.teleport = teleported
-    return approach
-  end
-  local ladders = gc.read("objects", {
-    where = { name = "Ladder" },
-    action = "Climb-up",
-    within = 12,
-    limit = 4,
+  local journey = movement.walk(config.points.tomb_surface, 1, {
+    ticks = 300,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
   })
-  if #ladders == 0 then
-    return {
-      status = "rejected",
-      result = "glarial_tomb_exit_ladder_not_observed",
-      world = gc.read("player").world,
-      objects = gc.read("objects", { within = 12, limit = 30 }),
-      teleport = teleported,
-    }
-  end
-  local ladder = ladders[1]
-  local climbed = gc.await {
-    action = {
-      type = "object.interact",
-      id = ladder.id,
-      action = "Climb-up",
-      world = ladder.world,
-      within = 4,
-    },
-    breaks = false,
-    timeout = { game_ticks = 40 },
-  }
-  if climbed.status ~= "dispatched" then
-    climbed.teleport = teleported
-    return climbed
-  end
-  if not wait_for(function()
-    return not in_zone(gc.read("player").world, config.zones.glarial_tomb)
-  end, 30) then
-    return {
-      status = "timed_out",
-      result = "glarial_tomb_exit_unverified",
-      receipt = climbed,
-      teleport = teleported,
-    }
-  end
-  return {
-    status = "complete",
-    result = "glarial_tomb_left",
-    receipt = climbed,
-    teleport = teleported,
-  }
+  journey.teleport = teleported
+  return journey
 end
 
 local function escape()
-  if not in_zone(gc.read("player").world, config.zones.glarial_tomb) then
+  if not geometry.in_zone(gc.read("player").world, config.zones.glarial_tomb) then
     return { status = "complete", result = "not_in_glarial_tomb" }
   end
   return leave()

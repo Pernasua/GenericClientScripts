@@ -1,11 +1,8 @@
 local config = gc.require("config")
 local progress = gc.require("progress")
+local ui = gc.require("shared_ui")
 local travel = gc.require("travel")
 local gnome = gc.require("gnome_course")
-
-local function park_mouse()
-  return gc.await { action = { type = "mouse.offscreen" }, breaks = false }
-end
 
 local function terminal(status, target, start_xp, obstacles, laps, extra)
   local agility = gc.read("skills").agility
@@ -20,7 +17,7 @@ local function terminal(status, target, start_xp, obstacles, laps, extra)
     laps = laps,
   }
   if extra then result.receipt = extra end
-  park_mouse()
+  ui.park_mouse()
   return result
 end
 

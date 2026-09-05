@@ -29,52 +29,51 @@ end
 local function click(id)
   return gc.await {
     action = { type = "ui.click", widget_id = id },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
     timeout = { game_ticks = 20 },
   }
 end
 
 local function open_puzzle()
   if widget(WIDGETS.confirm) then return true end
-  local talked = gc.await {
-    action = { type = "npc.interact", id = NPC_ID, action = "Talk-to", within = 12 },
-    breaks = false,
-    timeout = { game_ticks = 30 },
-  }
-  if talked.status ~= "dispatched" then
-    return nil, { status = "talk_failed", receipt = talked }
-  end
-  for _ = 1, 30 do
-    gc.await { event = "game.tick" }
-    if widget(WIDGETS.confirm) then return true end
-    local dialogue = gc.read("dialogue")
-    if dialogue.type == "continue" then
-      local continued = gc.await {
-        action = { type = "dialogue.continue" },
-        breaks = false,
-      }
-      if continued.status ~= "dispatched" then
-        return nil, { status = "dialogue_failed", receipt = continued }
-      end
-    elseif dialogue.type == "choice" then
-      local selected = nil
-      for _, option in ipairs(dialogue.options) do
-        if option.text == ACCEPT_HELP then selected = option.text break end
-      end
-      if not selected then
-        return nil, { status = "unexpected_dialogue_choice", dialogue = dialogue }
-      end
-      local chosen = gc.await {
-        action = { type = "dialogue.choose", text = selected },
-        breaks = false,
-        timeout = { game_ticks = 20 },
-      }
-      if chosen.status ~= "dispatched" then
-        return nil, { status = "dialogue_choice_failed", receipt = chosen }
+  return gc.intent("capt_arnav.open_puzzle", function()
+    local talked = gc.await {
+      action = { type = "npc.interact", id = NPC_ID, action = "Talk-to", within = 12 },
+      timeout = { game_ticks = 30 },
+    }
+    if talked.status ~= "dispatched" then
+      return nil, { status = "talk_failed", receipt = talked }
+    end
+    for _ = 1, 30 do
+      gc.await { event = "game.tick" }
+      if widget(WIDGETS.confirm) then return true end
+      local dialogue = gc.read("dialogue")
+      if dialogue.type == "continue" then
+        local continued = gc.await {
+          action = { type = "dialogue.continue" },
+        }
+        if continued.status ~= "dispatched" then
+          return nil, { status = "dialogue_failed", receipt = continued }
+        end
+      elseif dialogue.type == "choice" then
+        local selected = nil
+        for _, option in ipairs(dialogue.options) do
+          if option.text == ACCEPT_HELP then selected = option.text break end
+        end
+        if not selected then
+          return nil, { status = "unexpected_dialogue_choice", dialogue = dialogue }
+        end
+        local chosen = gc.await {
+          action = { type = "dialogue.choose", text = selected },
+          timeout = { game_ticks = 20 },
+        }
+        if chosen.status ~= "dispatched" then
+          return nil, { status = "dialogue_choice_failed", receipt = chosen }
+        end
       end
     end
-  end
-  return nil, { status = "puzzle_not_open", event = gc.read("random_event") }
+    return nil, { status = "puzzle_not_open", event = gc.read("random_event") }
+  end)
 end
 
 local function required_values()
@@ -164,7 +163,7 @@ return {
       end
       local dialogue = gc.read("dialogue")
       if dialogue.type == "continue" then
-        gc.await { action = { type = "dialogue.continue" }, breaks = false }
+        gc.await { action = { type = "dialogue.continue" }, policy = { breaks = false, cursor_release = "none", fidget = "none" } }
       end
     end
     error("Capt' Arnav confirmation had no observable reward receipt")

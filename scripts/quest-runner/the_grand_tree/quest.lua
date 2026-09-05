@@ -35,7 +35,7 @@ local function execute(phase, input)
     return interactions.talk_charlie()
   end
   if phase == "search_glough_journal" then
-    local reached, failure = navigation.return_to_glough_for_journal()
+    local reached, failure = navigation.reach_glough()
     if not reached then return failure end
     return interactions.search_glough_cupboard()
   end
@@ -69,12 +69,12 @@ local function execute(phase, input)
     return interactions.talk_anita()
   end
   if phase == "find_invasion_plans" then
-    local reached, failure = navigation.reach_glough_for_invasion_plans()
+    local reached, failure = navigation.reach_glough()
     if not reached then return failure end
     return interactions.obtain_invasion_plans()
   end
   if phase == "return_invasion_plans" then
-    local reached, failure = navigation.return_invasion_plans_to_narnode()
+    local reached, failure = navigation.return_after_glough()
     if not reached then return failure end
     return interactions.return_invasion_plans_to_narnode()
   end

@@ -17,25 +17,30 @@ The existing scripting interface remains the seam:
 gc.read(subject, query)
 gc.await(request)
 gc.log(level, event, fields)
-gc.activity(name)
+gc.activity(name, policy)
+gc.intent(name, fn)
 gc.state(name)
 gc.phase(name, options)
 gc.overlay(rows)
 gc.next_action()
 ```
 
-New subjects and action types deepen that interface; they do not add new global
-functions. A script author should learn the same five operations whether a
+New subjects and action types use that interface. A script author uses the same
+operations whether a
 quest has ten steps or one hundred.
 
 ## Ownership
 
 ```text
+scripts/shared/
+  bank, behaviors, consumables, equipment, exchange, failure, geometry, items,
+  loadouts, movement, progress, protection, skills, travel, UI, wait
+
 quest-runner.lua
   dropdown, active-quest selection, overlay, orchestration
   |
   +-- quest-runner/shared/
-  |     state, preparation, travel mechanics used by multiple quests
+  |     quest state capture and quest loadout preparation
   |
   +-- quest-runner/witchs_house/
   |     config, reducer, quest interactions, garden, combat, completion
@@ -45,8 +50,10 @@ quest-runner.lua
   |     config, reducer, interactions, navigation, combat, runner
   +-- quest-runner/fight_arena/
   |     config, reducer, interactions, navigation, combat, runner
-  `-- quest-runner/the_grand_tree/
-        config, reducer, interactions, navigation, quest, runner
+  +-- quest-runner/the_grand_tree/
+  |     config, reducer, interactions, navigation, quest, runner
+  `-- quest-runner/monkey_madness_i/
+        areas, config, reducer, preparation, interactions, navigation, quest modules, runner
                          |
                          | gc.read / gc.await
                          v
@@ -81,7 +88,7 @@ accepted an action.
 Each phase declares:
 
 - a stable ID and compact overlay label;
-- whether ordinary breaks are allowed;
+- its activity and any independent behavior policy overrides;
 - a bounded action function;
 - a postcondition and game-tick timeout;
 - whether `stop_safely` may terminate immediately or must first reach a safe
@@ -112,7 +119,7 @@ in-progress phases but never prove completion.
 | `object.interact` | Re-resolve an object by ID and optional WorldPoint, validate its live action, face it once if off-camera, use synthetic left/context click, and return the observed menu event. |
 | `item.interact` | Re-resolve an inventory slot by item ID and invoke a named action such as `Read`, `Wear`, `Eat`, or `Rub`. |
 | `equipment.interact` | Open Equipment, re-resolve the exact worn item, and invoke a semantic action such as `Remove`. |
-| `item.use_on_object` | Select `Use` on the requested inventory item, then resolve and click the exact object ID/WorldPoint. Both clicks receive behavior receipts unless `breaks=false`. |
+| `item.use_on_object` | Select `Use` on the requested inventory item, then resolve and click the exact object ID/WorldPoint within one semantic action boundary. |
 | `dialogue.continue` | Click the currently visible Continue surface; reject if the dialogue is a choice. |
 | `dialogue.choose` | Click an exact visible option string and return its index/text. No substring-first or fixed-index fallback. |
 | `bank.loadout` | With a bank open, deposit inventory/equipment as requested, withdraw exact item quantities, verify the resulting allowlist and free slots, and close. |
@@ -128,9 +135,13 @@ not. This is an internal seam with a live RuneLite adapter and deterministic
 test adapter, not another Lua-facing interface.
 
 Lua implements `wait_until` by awaiting game ticks and rereading snapshots.
-Lua implements a critical section by sending `breaks=false` on every contained
-interaction. Those are composition rules over the existing interface, not new
-Java actions.
+Lua groups a short conversation, item sequence, or bank transaction with
+`gc.intent(name, fn)`. The host opens one boundary at entry and suppresses
+discretionary behavior inside it. Nested scopes flatten; errors unwind the
+scope and propagate. Long approaches and training loops stay outside intents.
+One-off urgent actions use an explicit policy with `breaks = false`,
+`cursor_release = "none"`, and `fidget = "none"`. The old per-await flag is
+rejected. These policies preserve safety and route ownership.
 
 ## Receipts and postconditions
 
@@ -139,7 +150,7 @@ Every mutating action returns:
 - `status`: `dispatched`, `complete`, `unchanged`, `rejected`, or `timed_out`;
 - the resolved target/item/widget identity;
 - dispatch path and actual click count;
-- behavior receipts for every composite interaction;
+- behavior receipts for each semantic action, plus the active intent when scoped;
 - an action-specific observed result, never a claim that an unobserved server
   transition succeeded.
 
@@ -166,19 +177,48 @@ price or reserve failure stops with a receipt for review.
 
 ## Safety model
 
-- Auto-retaliate is disabled before quest travel and rechecked after login.
+- Auto-retaliate defaults on. Hazardous movement and scripted target selection
+  disable it explicitly; ordinary questing restores it so incidental attackers
+  are handled without target-specific Lua.
 - Each combat script arms `safety.configure` with its own hard floor, approved
   consumables, and optional safe destination. The Java guard preempts breaks and
   active input. It normally chooses a heal that fits, forces an approved heal
   below 30% max HP even when it overheals, and lets the Lua fight continue after
   a successful heal. It stops and escapes only when food is unavailable at the
   forced point or hard floor.
-- Safe travel may use normal behavior rolls. Hostile rooms and irreversible
-  interaction groups use `breaks=false` until a safe checkpoint.
-- Monkey Madness keeps Protect from Missiles active only for the hostile south
-  crossing. Capture dialogue is drained before jail interactions, protection is
-  disabled before waiting on the guard cycle, and Garkor is resolved by his
-  observed name so inventory maintenance cannot interrupt the briefing.
+- Safe travel uses the declared travel policy. Hostile travel and escape actions
+  declare their independent policy overrides; short interaction sequences use
+  intents. Emergency input and physical takeover remain able to interrupt them.
+- Mainland travel delegates one destination directly to the global walker.
+  It does not insert road waypoints through Varrock buildings; doors and walls
+  are costed by the client navigation graph.
+- Monkey Madness uses Protect from Missiles from the prison exit to the observed
+  west edge of the gorilla temple at `x=2787, y=2784..2789`, then switches
+  directly to Protect from Melee before taking another interior step. The
+  trapdoor approach replans around live gorilla footprints and changes adjacent
+  approach tile after a body-block. The denture-building path supplies Quest
+  Helper's light-floor tiles to the generic walker as explicit exclusions.
+  The amulet checkpoint keeps Protect from Melee active while using the
+  enchanted bar from `(2811,9208)` on the accessible south-center flame segment
+  at `(2811,9209)`, stringing and equipping the amulet, climbing the
+  rope, and following every Quest Helper waypoint to `(2746,2797)`. It stops
+  there before talking to the child. The Zooknock run keeps hazardous travel,
+  Protect from Melee, and the emergency food guard active while delivering the
+  talisman and bones; it does not stop quest progress to attack dungeon NPCs.
+  After receiving the Karamjan greegree it teleports out with the carried ring,
+  then disables the dungeon prayer at Castle Wars. Ordinary action failures return to the
+  framework safety owner and never invoke a quest-local ring teleport.
+  The ordered Zooknock cave route persists its last verified waypoint through
+  Stop or client restart, searches only forward from that cursor, clears stale
+  progress on a fresh dungeon entry, and clears completed progress after the
+  verified dungeon exit.
+  The Jungle Demon step requests magic protection through the shared protection
+  helper. Capture dialogue is drained before jail
+  interactions; prison combat is allowed to settle and the player is
+  re-anchored before each timed guard interaction.
+- The `prison_cell` scope prepares the required loadout, returns to Ape Atoll,
+  opens the cell door on an observed guard window, and terminates on the west
+  safe tile. It never enters the separate outer-prison exit loop.
 - The runner checks HP/run/food immediately before every hostile transition and
   after every tick while exposed.
 - A cooperative stop inside a critical section first exits or reaches the next

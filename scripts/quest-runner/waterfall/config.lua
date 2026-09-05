@@ -13,23 +13,23 @@ local zones = {
 
 local points = {
   almera = { x = 2521, y = 3495, plane = 0 },
-  raft = { x = 2509, y = 3493, plane = 0 },
+  hudon_landing = { x = 2512, y = 3481, plane = 0 },
   hudon = { x = 2511, y = 3484, plane = 0 },
   crossing_rock_stand = { x = 2512, y = 3476, plane = 0 },
   crossing_rock = { x = 2512, y = 3468, plane = 0 },
   overhanging_tree = { x = 2512, y = 3465, plane = 0 },
   falls_entrance = { x = 2511, y = 3464, plane = 0 },
   barrel = { x = 2512, y = 3463, plane = 0 },
-  tourist_stairs = { x = 2517, y = 3429, plane = 0 },
-  tourist_stairs_top = { x = 2518, y = 3430, plane = 1 },
+  tourist_ground = { x = 2519, y = 3430, plane = 0 },
+  tourist_upstairs = { x = 2518, y = 3431, plane = 1 },
   bookcase = { x = 2520, y = 3426, plane = 1 },
-  gnome_ladder = { x = 2533, y = 3155, plane = 0 },
-  gnome_ladder_below = { x = 2533, y = 9555, plane = 0 },
+  gnome_surface = { x = 2533, y = 3156, plane = 0 },
+  gnome_basement_entrance = { x = 2533, y = 9556, plane = 0 },
   golrie_crate = { x = 2548, y = 9565, plane = 0 },
   golrie_gate = { x = 2515, y = 9575, plane = 0 },
   golrie = { x = 2514, y = 9580, plane = 0 },
   tombstone = { x = 2559, y = 3445, plane = 0 },
-  tomb_exit = { x = 2556, y = 9844, plane = 0 },
+  tomb_surface = { x = 2557, y = 3444, plane = 0 },
   amulet_chest = { x = 2530, y = 9844, plane = 0 },
   urn_tomb = { x = 2542, y = 9812, plane = 0 },
   falls_crate = { x = 2589, y = 9888, plane = 0 },
@@ -39,7 +39,6 @@ local points = {
 }
 
 local objects = {
-  raft = 1987,
   bookcase = 1989,
   golrie_crate = 1990,
   golrie_gate = 1991,
@@ -57,10 +56,6 @@ local objects = {
   chalice = 2014,
   overhanging_tree = 2020,
   barrel = 2022,
-  gnome_ladder = 5250,
-  gnome_ladder_below = 17387,
-  tourist_stairs = 16671,
-  tourist_stairs_top = 16673,
 }
 
 local varbits = {
@@ -171,28 +166,6 @@ local final_key_loadout = {
 }
 for _, item in ipairs(final_loadout) do table.insert(final_key_loadout, item) end
 
-local gnome_route = {
-  { x = 2505, y = 3190, plane = 0 }, { x = 2512, y = 3190, plane = 0 },
-  { x = 2512, y = 3188, plane = 0 }, { x = 2532, y = 3188, plane = 0 },
-  { x = 2532, y = 3182, plane = 0 }, { x = 2523, y = 3181, plane = 0 },
-  { x = 2523, y = 3185, plane = 0 }, { x = 2521, y = 3185, plane = 0 },
-  { x = 2520, y = 3179, plane = 0 }, { x = 2514, y = 3179, plane = 0 },
-  { x = 2514, y = 3177, plane = 0 }, { x = 2527, y = 3177, plane = 0 },
-  { x = 2527, y = 3179, plane = 0 }, { x = 2529, y = 3179, plane = 0 },
-  { x = 2529, y = 3177, plane = 0 }, { x = 2531, y = 3177, plane = 0 },
-  { x = 2531, y = 3179, plane = 0 }, { x = 2533, y = 3179, plane = 0 },
-  { x = 2533, y = 3177, plane = 0 }, { x = 2544, y = 3177, plane = 0 },
-  { x = 2544, y = 3174, plane = 0 }, { x = 2549, y = 3174, plane = 0 },
-  { x = 2549, y = 3165, plane = 0 }, { x = 2545, y = 3165, plane = 0 },
-  { x = 2545, y = 3159, plane = 0 }, { x = 2550, y = 3159, plane = 0 },
-  { x = 2550, y = 3156, plane = 0 }, { x = 2548, y = 3156, plane = 0 },
-  { x = 2548, y = 3145, plane = 0 }, { x = 2538, y = 3145, plane = 0 },
-  { x = 2538, y = 3150, plane = 0 }, { x = 2541, y = 3150, plane = 0 },
-  { x = 2541, y = 3148, plane = 0 }, { x = 2544, y = 3148, plane = 0 },
-  { x = 2544, y = 3150, plane = 0 }, { x = 2545, y = 3150, plane = 0 },
-  { x = 2545, y = 3155, plane = 0 },
-}
-
 return {
   id = "waterfall",
   label = "Waterfall Quest",
@@ -209,5 +182,4 @@ return {
   tomb_urn_loadout = tomb_urn_loadout,
   final_loadout = final_loadout,
   final_key_loadout = final_key_loadout,
-  gnome_route = gnome_route,
 }

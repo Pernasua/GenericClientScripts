@@ -1,49 +1,6 @@
 local config = gc.require("fight_arena_config")
-
-local function distance(a, b)
-  if not a or not b or a.plane ~= b.plane then return 99999 end
-  return math.max(math.abs(a.x - b.x), math.abs(a.y - b.y))
-end
-
-local function wait_for(predicate, ticks)
-  for _ = 1, ticks do
-    gc.await { event = "game.tick" }
-    if predicate() then return true end
-  end
-  return false
-end
-
-local function walk(world, within, breaks, ticks)
-  return gc.await {
-    action = {
-      type = "walk.to",
-      destination = world,
-      within = within or 3,
-      run = true,
-    },
-    breaks = breaks ~= false,
-    timeout = { game_ticks = ticks or 900 },
-  }
-end
-
-local function approach(world, within, breaks)
-  if distance(gc.read("player").world, world) <= (within or 3) then
-    return { status = "arrived", result = "already_near_target" }
-  end
-  return walk(world, within, breaks)
-end
-
-local function quantity(container, id)
-  local total = 0
-  for _, item in ipairs((container and container.items) or {}) do
-    if item.id == id then total = total + item.quantity end
-  end
-  return total
-end
-
-local function carried(id)
-  return quantity(gc.read("inventory"), id) + quantity(gc.read("equipment"), id)
-end
+local movement = gc.require("shared_movement")
+local wait = gc.require("shared_wait")
 
 local function id_list(ids)
   return type(ids) == "table" and ids or { ids }
@@ -57,10 +14,10 @@ local function npc(ids, within)
   return nil
 end
 
-local function reach_npc(ids, fallback, breaks)
+local function reach_npc(ids, fallback, policy)
   local target = npc(ids, 20)
   if not target then
-    local near = approach(fallback, 3, breaks)
+    local near = movement.approach(fallback, 3, { policy = policy })
     if near.status ~= "arrived" then return nil, near end
     gc.await { event = "game.tick" }
     target = npc(ids, 20)
@@ -75,7 +32,7 @@ local function reach_npc(ids, fallback, breaks)
     }
   end
   if target.distance > 2 or not target.line_of_sight or not target.clickable then
-    local reached = walk(target.world, 2, breaks, 180)
+    local reached = movement.walk(target.world, 2, { ticks = 180, policy = policy })
     if reached.status ~= "arrived" then
       return nil, { status = "npc_approach_failed", target = target, receipt = reached }
     end
@@ -110,13 +67,13 @@ local function quest_finished()
   return quests.fight_arena and quests.fight_arena.state == "finished"
 end
 
-local function choose(dialogue, choices, breaks)
+local function choose(dialogue, choices, policy)
   for _, wanted in ipairs(choices or {}) do
     for _, option in ipairs(dialogue.options or {}) do
       if option.text == wanted then
         return gc.await {
           action = { type = "dialogue.choose", text = option.text },
-          breaks = breaks,
+          policy = policy,
           timeout = { game_ticks = 20 },
         }
       end
@@ -125,7 +82,7 @@ local function choose(dialogue, choices, breaks)
   return { status = "rejected", result = "unexpected_dialogue_choice", dialogue = dialogue }
 end
 
-local function finish_dialogue(predicate, choices, breaks, ticks)
+local function finish_dialogue(predicate, choices, policy, ticks)
   local progressed = false
   local closed_ticks = 0
   local receipts = {}
@@ -137,14 +94,14 @@ local function finish_dialogue(predicate, choices, breaks, ticks)
       closed_ticks = 0
       local receipt = gc.await {
         action = { type = "dialogue.continue" },
-        breaks = breaks,
+        policy = policy,
         timeout = { game_ticks = 20 },
       }
       receipts[#receipts + 1] = receipt
       if receipt.status ~= "dispatched" then return nil, receipt end
     elseif dialogue.type == "choice" then
       closed_ticks = 0
-      local receipt = choose(dialogue, choices, breaks)
+      local receipt = choose(dialogue, choices, policy)
       receipts[#receipts + 1] = receipt
       if receipt.status ~= "dispatched" then return nil, receipt end
     elseif progressed then
@@ -160,18 +117,17 @@ local function finish_dialogue(predicate, choices, breaks, ticks)
   }
 end
 
-local function talk(ids, world, predicate, choices, breaks)
-  local allow_breaks = breaks ~= false
-  local target, failure = reach_npc(ids, world, allow_breaks)
+local function talk(ids, world, predicate, choices, policy)
+  local target, failure = reach_npc(ids, world, policy)
   if not target then return failure end
   local clicked = gc.await {
     action = { type = "npc.interact", id = target.id, action = "Talk-to", within = 12 },
-    breaks = allow_breaks,
+    policy = policy,
     timeout = { game_ticks = 40 },
   }
   if clicked.status ~= "dispatched" then return clicked end
   local dialogue, dialogue_failure = finish_dialogue(
-    predicate, choices, allow_breaks, 100)
+    predicate, choices, policy, 100)
   if not dialogue then return dialogue_failure end
   return {
     status = "complete",
@@ -190,9 +146,8 @@ local function object(id, action, within)
   })[1]
 end
 
-local function object_action(id, action, point, predicate, breaks, within)
-  local allow_breaks = breaks ~= false
-  local near = approach(point, 3, allow_breaks)
+local function object_action(id, action, point, predicate, policy, within)
+  local near = movement.approach(point, 3, { policy = policy })
   if near.status ~= "arrived" then return near end
   gc.await { event = "game.tick" }
   local target = object(id, action, within)
@@ -213,20 +168,19 @@ local function object_action(id, action, point, predicate, breaks, within)
       world = target.world,
       within = within or 16,
     },
-    breaks = allow_breaks,
+    policy = policy,
     timeout = { game_ticks = 40 },
   }
   if clicked.status ~= "dispatched" then return clicked end
-  if not wait_for(predicate, 40) then
+  if not wait.until_true(predicate, 40) then
     return { status = "timed_out", result = "object_result_unverified", receipt = clicked }
   end
   return { status = "complete", result = "object_result_verified", receipt = clicked }
 end
 
-local function use_on_object(item_id, object_id, point, predicate, breaks, within)
-  local allow_breaks = breaks ~= false
+local function use_on_object(item_id, object_id, point, predicate, policy, within)
   local radius = within or 8
-  local near = approach(point, 3, allow_breaks)
+  local near = movement.approach(point, 3, { policy = policy })
   if near.status ~= "arrived" then return near end
   gc.await { event = "game.tick" }
   local target = gc.read("objects", { id = object_id, within = radius, limit = 10 })[1]
@@ -246,11 +200,11 @@ local function use_on_object(item_id, object_id, point, predicate, breaks, withi
       world = target.world,
       within = radius,
     },
-    breaks = allow_breaks,
+    policy = policy,
     timeout = { game_ticks = 40 },
   }
   if clicked.status ~= "dispatched" then return clicked end
-  local dialogue, failure = finish_dialogue(predicate, {}, allow_breaks, 100)
+  local dialogue, failure = finish_dialogue(predicate, {}, policy, 100)
   if not dialogue then return failure end
   return {
     status = "complete",
@@ -261,12 +215,6 @@ local function use_on_object(item_id, object_id, point, predicate, breaks, withi
 end
 
 return {
-  distance = distance,
-  wait_for = wait_for,
-  walk = walk,
-  approach = approach,
-  quantity = quantity,
-  carried = carried,
   npc = npc,
   vars = vars,
   varp = varp,

@@ -1,4 +1,6 @@
 local config = gc.require("tree_gnome_config")
+local behaviors = gc.require("shared_behaviors")
+local item_queries = gc.require("shared_items")
 local state_module = gc.require("tree_gnome_state")
 local quest = gc.require("tree_gnome_quest")
 local shared = gc.require("shared_state")
@@ -72,14 +74,11 @@ local function prepare(phase, restock)
 end
 
 local function configure_safety(state)
-  local retaliate = gc.await {
-    action = { type = "combat.set_auto_retaliate", enabled = false },
-    breaks = false,
-    timeout = { game_ticks = 20 },
+  local retaliate, behavior_failure = behaviors.configure {
+    auto_retaliate = false,
+    emergency_escape = true,
   }
-  if retaliate.status ~= "set" and retaliate.status ~= "unchanged" then
-    return nil, { status = "auto_retaliate_failed", receipt = retaliate }
-  end
+  if not retaliate then return nil, behavior_failure end
   local threshold = math.max(4, math.floor(state.player.max_hitpoints * 0.25))
   local safety = gc.await {
     action = {
@@ -89,7 +88,7 @@ local function configure_safety(state)
       continue_after_consumable = true,
       allow_overheal = false,
     },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
   }
   if safety.status ~= "complete" then
     return nil, { status = "safety_guard_failed", receipt = safety }
@@ -98,11 +97,11 @@ local function configure_safety(state)
 end
 
 local function food_count(state)
-  return shared.quantity(state.inventory, config.items.food)
+  return item_queries.quantity(state.inventory, config.items.food)
 end
 
 local function clear_safety()
-  local cleared = gc.await { action = { type = "safety.clear" }, breaks = false }
+  local cleared = gc.await { action = { type = "safety.clear" }, policy = { breaks = false, cursor_release = "none", fidget = "none" } }
   if cleared.status ~= "complete" then
     return nil, { status = "safety_clear_failed", receipt = cleared }
   end
@@ -128,7 +127,7 @@ local function run(input)
   local initial_rank = checkpoint_rank[initial_phase] or -1
 
   if initial_phase == "complete" then
-    gc.await { action = { type = "mouse.offscreen" }, breaks = false }
+    gc.await { action = { type = "mouse.offscreen" }, policy = { breaks = false, cursor_release = "none", fidget = "none" } }
     return { status = "complete", quest = config.id, varp = initial.varp }
   end
   if initial_phase == "strict_stats_block" or initial_phase == "bank_unknown" or
@@ -161,12 +160,12 @@ local function run(input)
     gc.log("info", "quest-phase", { quest = config.id, phase = phase, varp = state.varp })
 
     if phase == "complete" then
-      gc.await { action = { type = "safety.clear" }, breaks = false }
-      gc.await { action = { type = "mouse.offscreen" }, breaks = false }
+      gc.await { action = { type = "safety.clear" }, policy = { breaks = false, cursor_release = "none", fidget = "none" } }
+      gc.await { action = { type = "mouse.offscreen" }, policy = { breaks = false, cursor_release = "none", fidget = "none" } }
       return { status = "complete", quest = config.id, varp = state.varp }
     end
     if input.scope == "checkpoint" and (checkpoint_rank[phase] or -1) > initial_rank then
-      gc.await { action = { type = "mouse.offscreen" }, breaks = false }
+      gc.await { action = { type = "mouse.offscreen" }, policy = { breaks = false, cursor_release = "none", fidget = "none" } }
       return { status = phase .. "_checkpoint", quest = config.id, varp = state.varp }
     end
     if phase == "loadout_required" or phase == "combat_loadout_required" then
@@ -187,7 +186,7 @@ local function run(input)
         return { status = "stopped", quest = config.id, phase = phase }
       end
       if break_bypass[phase] then
-        gc.phase("quest." .. config.id .. "." .. phase, { breaks = false })
+        gc.phase("quest." .. config.id .. "." .. phase, { policy = { breaks = false, cursor_release = "none", fidget = "none" } })
       else
         gc.phase("quest." .. config.id .. "." .. phase)
       end

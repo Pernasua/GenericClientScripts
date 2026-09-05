@@ -8,6 +8,11 @@
       "file": "aio-agility.lua",
       "modules": {
         "config": "aio-agility/config.lua",
+        "shared_geometry": "shared/geometry.lua",
+        "shared_movement": "shared/movement.lua",
+        "shared_progress": "shared/progress.lua",
+        "shared_skills": "shared/skills.lua",
+        "shared_ui": "shared/ui.lua",
         "progress": "aio-agility/progress.lua",
         "travel": "aio-agility/travel.lua",
         "gnome_course": "aio-agility/courses/gnome_stronghold.lua",
@@ -21,10 +26,24 @@
       "file": "aio-magic.lua",
       "modules": {
         "config": "aio-magic/config.lua",
+        "shared_bank": "shared/bank.lua",
+        "shared_behaviors": "shared/behaviors.lua",
+        "shared_equipment": "shared/equipment.lua",
+        "shared_exchange": "shared/exchange.lua",
+        "shared_geometry": "shared/geometry.lua",
+        "shared_items": "shared/items.lua",
+        "shared_loadouts": "shared/loadouts.lua",
+        "shared_progress": "shared/progress.lua",
+        "shared_skills": "shared/skills.lua",
+        "shared_travel": "shared/travel.lua",
+        "shared_ui": "shared/ui.lua",
+        "shared_wait": "shared/wait.lua",
         "preparation": "aio-magic/preparation.lua",
         "progress": "aio-magic/progress.lua",
         "supplies": "aio-magic/supplies.lua",
-        "training": "aio-magic/training.lua"
+        "training": "aio-magic/training.lua",
+        "superheat": "aio-magic/superheat.lua",
+        "alchemy": "aio-magic/alchemy.lua"
       }
     },
     {
@@ -34,24 +53,66 @@
       "file": "aio-prayer.lua",
       "modules": {
         "config": "aio-prayer/config.lua",
+        "shared_bank": "shared/bank.lua",
+        "shared_equipment": "shared/equipment.lua",
+        "shared_exchange": "shared/exchange.lua",
+        "shared_geometry": "shared/geometry.lua",
+        "shared_items": "shared/items.lua",
+        "shared_progress": "shared/progress.lua",
+        "shared_travel": "shared/travel.lua",
+        "shared_ui": "shared/ui.lua",
+        "shared_wait": "shared/wait.lua",
         "preparation": "aio-prayer/preparation.lua",
         "progress": "aio-prayer/progress.lua",
         "training": "aio-prayer/training.lua",
-        "runner": "aio-prayer/runner.lua",
-        "travel": "quest-runner/shared/travel.lua"
+        "runner": "aio-prayer/runner.lua"
       }
     },
     {
       "id": "aio-melee",
       "name": "AIO Melee Trainer",
       "description": "Train Attack, Strength, or Defence to an exact target with method selection and recovery receipts.",
-      "file": "aio-melee.lua"
+      "file": "aio-melee.lua",
+      "modules": {
+        "shared_behaviors": "shared/behaviors.lua",
+        "shared_geometry": "shared/geometry.lua"
+      }
+    },
+    {
+      "id": "aio-thieving",
+      "name": "AIO Thieving Trainer",
+      "description": "Train Thieving to an exact target with safe stall positioning, banked loot, and verified XP receipts.",
+      "file": "aio-thieving.lua",
+      "modules": {
+        "config": "aio-thieving/config.lua",
+        "shared_bank": "shared/bank.lua",
+        "shared_behaviors": "shared/behaviors.lua",
+        "shared_geometry": "shared/geometry.lua",
+        "shared_movement": "shared/movement.lua",
+        "shared_progress": "shared/progress.lua",
+        "shared_skills": "shared/skills.lua",
+        "shared_ui": "shared/ui.lua",
+        "progress": "aio-thieving/progress.lua",
+        "travel": "aio-thieving/travel.lua",
+        "training": "aio-thieving/training.lua",
+        "runner": "aio-thieving/runner.lua"
+      }
     },
     {
       "id": "account-auditor",
       "name": "Account Auditor",
       "description": "Inspect live skills, items, quests, offers, and known cash without changing the account.",
       "file": "account-auditor.lua"
+    },
+    {
+      "id": "death-recovery",
+      "name": "Death Recovery",
+      "description": "Recover every available item from Death's Office and return to Lumbridge.",
+      "file": "death-recovery.lua",
+      "modules": {
+        "config": "death-recovery/config.lua",
+        "runner": "death-recovery/runner.lua"
+      }
     },
     {
       "id": "capt-arnav",
@@ -61,10 +122,23 @@
       "random_events": [5426]
     },
     {
+      "id": "certer",
+      "name": "Certer",
+      "description": "Identify Certer's live item model and select its matching randomized answer.",
+      "file": "certer.lua",
+      "modules": {
+        "shared_failure": "shared/failure.lua"
+      },
+      "random_events": [5436, 5437, 5438, 5439, 5440, 5441]
+    },
+    {
       "id": "count-check",
       "name": "Count Check",
       "description": "Complete Count Check's account-security check from observed dialogue.",
       "file": "count-check.lua",
+      "modules": {
+        "shared_failure": "shared/failure.lua"
+      },
       "random_events": [12551, 12552]
     },
     {
@@ -72,6 +146,9 @@
       "name": "Drunken Dwarf",
       "description": "Talk to the Drunken Dwarf and accept his food and drink.",
       "file": "drunken-dwarf.lua",
+      "modules": {
+        "shared_failure": "shared/failure.lua"
+      },
       "random_events": [322]
     },
     {
@@ -80,15 +157,41 @@
       "description": "Catch, uncook, and feed Evil Bob the correct ScapeRune fish.",
       "file": "evil-bob.lua",
       "modules": {
-        "island": "evil-bob/island.lua"
+        "island": "evil-bob/island.lua",
+        "shared_failure": "shared/failure.lua",
+        "shared_geometry": "shared/geometry.lua",
+        "shared_items": "shared/items.lua",
+        "shared_movement": "shared/movement.lua"
       },
       "random_events": [390]
+    },
+    {
+      "id": "prison-pete",
+      "name": "Prison Pete",
+      "description": "Match the lever model to an exact balloon family, return three keys, and verify the reward.",
+      "file": "prison-pete.lua",
+      "modules": {
+        "event": "prison-pete/event.lua",
+        "shared_failure": "shared/failure.lua",
+        "shared_items": "shared/items.lua"
+      },
+      "random_events": [6754]
+    },
+    {
+      "id": "genie",
+      "name": "Genie",
+      "description": "Accept the Genie's lamp and require the reward message, inventory receipt, and departure.",
+      "file": "genie.lua",
+      "random_events": [326]
     },
     {
       "id": "mime",
       "name": "Mime",
       "description": "Accept the Mime show and copy each observed performance until its reward is verified.",
       "file": "mime.lua",
+      "modules": {
+        "shared_failure": "shared/failure.lua"
+      },
       "random_events": [6753]
     },
     {
@@ -96,6 +199,9 @@
       "name": "Molly",
       "description": "Match Molly's appearance and capture her evil twin with the live crane controls.",
       "file": "molly.lua",
+      "modules": {
+        "shared_failure": "shared/failure.lua"
+      },
       "random_events": [6738]
     },
     {
@@ -103,72 +209,112 @@
       "name": "Pinball",
       "description": "Play Flippa's pinball game from the live target and score state.",
       "file": "pinball.lua",
+      "modules": {
+        "shared_failure": "shared/failure.lua"
+      },
       "random_events": [6744]
+    },
+    {
+      "id": "prison-guard-observer",
+      "name": "Prison Guard Observer",
+      "description": "Highlight the Ape Atoll prison guards and show their live tile and facing direction.",
+      "file": "prison-guard-observer.lua",
+      "modules": {
+        "shared_geometry": "shared/geometry.lua"
+      }
     },
     {
       "id": "rick-turpentine",
       "name": "Rick Turpentine",
       "description": "Accept Rick Turpentine's restitution gift and verify its reward message.",
       "file": "rick-turpentine.lua",
+      "modules": {
+        "shared_failure": "shared/failure.lua"
+      },
       "random_events": [375]
     },
     {
-        "id": "quest-runner",
-        "name": "Quest Runner",
-        "description": "Run resumable quest phases from observed state with strict safety gates and exact interaction receipts.",
-        "file": "quest-runner.lua",
-        "modules": {
-          "shared_preparation": "quest-runner/shared/preparation.lua",
-          "shared_state": "quest-runner/shared/state.lua",
-          "shared_travel": "quest-runner/shared/travel.lua",
-          "tree_gnome_combat": "quest-runner/tree_gnome_village/combat.lua",
-          "tree_gnome_config": "quest-runner/tree_gnome_village/config.lua",
-          "tree_gnome_interactions": "quest-runner/tree_gnome_village/interactions.lua",
-          "tree_gnome_navigation": "quest-runner/tree_gnome_village/navigation.lua",
-          "tree_gnome_quest": "quest-runner/tree_gnome_village/quest.lua",
-          "tree_gnome_runner": "quest-runner/tree_gnome_village/runner.lua",
-          "tree_gnome_state": "quest-runner/tree_gnome_village/state.lua",
-          "fight_arena_combat": "quest-runner/fight_arena/combat.lua",
-          "fight_arena_config": "quest-runner/fight_arena/config.lua",
-          "fight_arena_interactions": "quest-runner/fight_arena/interactions.lua",
-          "fight_arena_navigation": "quest-runner/fight_arena/navigation.lua",
-          "fight_arena_quest": "quest-runner/fight_arena/quest.lua",
-          "fight_arena_runner": "quest-runner/fight_arena/runner.lua",
-          "fight_arena_state": "quest-runner/fight_arena/state.lua",
-          "grand_tree_config": "quest-runner/the_grand_tree/config.lua",
-          "grand_tree_combat": "quest-runner/the_grand_tree/combat.lua",
-          "grand_tree_completion": "quest-runner/the_grand_tree/completion.lua",
-          "grand_tree_interactions": "quest-runner/the_grand_tree/interactions.lua",
-          "grand_tree_navigation": "quest-runner/the_grand_tree/navigation.lua",
-          "grand_tree_quest": "quest-runner/the_grand_tree/quest.lua",
-          "grand_tree_runner": "quest-runner/the_grand_tree/runner.lua",
-          "grand_tree_state": "quest-runner/the_grand_tree/state.lua",
-          "monkey_madness_config": "quest-runner/monkey_madness_i/config.lua",
-          "monkey_madness_ape_atoll": "quest-runner/monkey_madness_i/ape_atoll.lua",
-          "monkey_madness_garkor": "quest-runner/monkey_madness_i/garkor.lua",
-          "monkey_madness_infiltration": "quest-runner/monkey_madness_i/infiltration.lua",
-          "monkey_madness_interactions": "quest-runner/monkey_madness_i/interactions.lua",
-          "monkey_madness_navigation": "quest-runner/monkey_madness_i/navigation.lua",
-          "monkey_madness_puzzle": "quest-runner/monkey_madness_i/puzzle.lua",
-          "monkey_madness_preparation": "quest-runner/monkey_madness_i/preparation.lua",
-          "monkey_madness_quest": "quest-runner/monkey_madness_i/quest.lua",
-          "monkey_madness_runner": "quest-runner/monkey_madness_i/runner.lua",
-          "monkey_madness_state": "quest-runner/monkey_madness_i/state.lua",
-          "witch_combat": "quest-runner/witchs_house/combat.lua",
-          "witch_completion": "quest-runner/witchs_house/completion.lua",
-          "witch_config": "quest-runner/witchs_house/config.lua",
-          "witch_experiment": "quest-runner/witchs_house/experiment.lua",
-          "witch_garden": "quest-runner/witchs_house/garden.lua",
-          "witch_quest": "quest-runner/witchs_house/quest.lua",
-          "witch_state": "quest-runner/witchs_house/state.lua",
-          "waterfall_config": "quest-runner/waterfall/config.lua",
-          "waterfall_navigation": "quest-runner/waterfall/navigation.lua",
-          "waterfall_preparation": "quest-runner/waterfall/preparation.lua",
-          "waterfall_quest": "quest-runner/waterfall/quest.lua",
-          "waterfall_ritual": "quest-runner/waterfall/ritual.lua",
-          "waterfall_tomb": "quest-runner/waterfall/tomb.lua",
-          "waterfall_state": "quest-runner/waterfall/state.lua"
-        }
+      "id": "quest-runner",
+      "name": "Quest Runner",
+      "description": "Run resumable quest phases from observed state with strict safety gates and exact interaction receipts.",
+      "file": "quest-runner.lua",
+      "modules": {
+        "shared_bank": "shared/bank.lua",
+        "shared_behaviors": "shared/behaviors.lua",
+        "shared_consumables": "shared/consumables.lua",
+        "shared_equipment": "shared/equipment.lua",
+        "shared_exchange": "shared/exchange.lua",
+        "shared_geometry": "shared/geometry.lua",
+        "shared_items": "shared/items.lua",
+        "shared_loadouts": "shared/loadouts.lua",
+        "shared_movement": "shared/movement.lua",
+        "shared_preparation": "quest-runner/shared/preparation.lua",
+        "shared_protection": "shared/protection.lua",
+        "shared_state": "quest-runner/shared/state.lua",
+        "shared_travel": "shared/travel.lua",
+        "shared_ui": "shared/ui.lua",
+        "shared_wait": "shared/wait.lua",
+        "tree_gnome_combat": "quest-runner/tree_gnome_village/combat.lua",
+        "tree_gnome_config": "quest-runner/tree_gnome_village/config.lua",
+        "tree_gnome_interactions": "quest-runner/tree_gnome_village/interactions.lua",
+        "tree_gnome_navigation": "quest-runner/tree_gnome_village/navigation.lua",
+        "tree_gnome_quest": "quest-runner/tree_gnome_village/quest.lua",
+        "tree_gnome_runner": "quest-runner/tree_gnome_village/runner.lua",
+        "tree_gnome_state": "quest-runner/tree_gnome_village/state.lua",
+        "fight_arena_combat": "quest-runner/fight_arena/combat.lua",
+        "fight_arena_config": "quest-runner/fight_arena/config.lua",
+        "fight_arena_interactions": "quest-runner/fight_arena/interactions.lua",
+        "fight_arena_navigation": "quest-runner/fight_arena/navigation.lua",
+        "fight_arena_quest": "quest-runner/fight_arena/quest.lua",
+        "fight_arena_runner": "quest-runner/fight_arena/runner.lua",
+        "fight_arena_state": "quest-runner/fight_arena/state.lua",
+        "grand_tree_config": "quest-runner/the_grand_tree/config.lua",
+        "grand_tree_combat": "quest-runner/the_grand_tree/combat.lua",
+        "grand_tree_completion": "quest-runner/the_grand_tree/completion.lua",
+        "grand_tree_interactions": "quest-runner/the_grand_tree/interactions.lua",
+        "grand_tree_navigation": "quest-runner/the_grand_tree/navigation.lua",
+        "grand_tree_quest": "quest-runner/the_grand_tree/quest.lua",
+        "grand_tree_runner": "quest-runner/the_grand_tree/runner.lua",
+        "grand_tree_state": "quest-runner/the_grand_tree/state.lua",
+        "monkey_madness_ape_atoll": "quest-runner/monkey_madness_i/ape_atoll.lua",
+        "monkey_madness_areas": "quest-runner/monkey_madness_i/areas.lua",
+        "monkey_madness_amulet": "quest-runner/monkey_madness_i/amulet.lua",
+        "monkey_madness_amulet_crafting": "quest-runner/monkey_madness_i/amulet_crafting.lua",
+        "monkey_madness_battle": "quest-runner/monkey_madness_i/battle.lua",
+        "monkey_madness_completion": "quest-runner/monkey_madness_i/completion.lua",
+        "monkey_madness_config": "quest-runner/monkey_madness_i/config.lua",
+        "monkey_madness_disguise": "quest-runner/monkey_madness_i/disguise.lua",
+        "monkey_madness_favor": "quest-runner/monkey_madness_i/favor.lua",
+        "monkey_madness_garkor": "quest-runner/monkey_madness_i/garkor.lua",
+        "monkey_madness_infiltration": "quest-runner/monkey_madness_i/infiltration.lua",
+        "monkey_madness_interactions": "quest-runner/monkey_madness_i/interactions.lua",
+        "monkey_madness_navigation": "quest-runner/monkey_madness_i/navigation.lua",
+        "monkey_madness_preparation": "quest-runner/monkey_madness_i/preparation.lua",
+        "monkey_madness_puzzle": "quest-runner/monkey_madness_i/puzzle.lua",
+        "monkey_madness_quest": "quest-runner/monkey_madness_i/quest.lua",
+        "monkey_madness_runner": "quest-runner/monkey_madness_i/runner.lua",
+        "monkey_madness_state": "quest-runner/monkey_madness_i/state.lua",
+        "witch_combat": "quest-runner/witchs_house/combat.lua",
+        "witch_completion": "quest-runner/witchs_house/completion.lua",
+        "witch_config": "quest-runner/witchs_house/config.lua",
+        "witch_experiment": "quest-runner/witchs_house/experiment.lua",
+        "witch_garden": "quest-runner/witchs_house/garden.lua",
+        "witch_quest": "quest-runner/witchs_house/quest.lua",
+        "witch_state": "quest-runner/witchs_house/state.lua",
+        "waterfall_config": "quest-runner/waterfall/config.lua",
+        "waterfall_navigation": "quest-runner/waterfall/navigation.lua",
+        "waterfall_preparation": "quest-runner/waterfall/preparation.lua",
+        "waterfall_quest": "quest-runner/waterfall/quest.lua",
+        "waterfall_ritual": "quest-runner/waterfall/ritual.lua",
+        "waterfall_state": "quest-runner/waterfall/state.lua",
+        "waterfall_tomb": "quest-runner/waterfall/tomb.lua"
+      }
+    },
+    {
+      "id": "safety-net",
+      "name": "Safety Net",
+      "description": "Recover from an unexpected script failure, then retain manual control until explicitly replaced or stopped.",
+      "file": "safety-net.lua"
     },
     {
       "id": "walker",
@@ -181,6 +327,12 @@
       "name": "Three-click movement check",
       "description": "Execute three nearby ground clicks through the active mouse profile.",
       "file": "walk-stress.lua"
+    },
+    {
+      "id": "xp-lamp",
+      "name": "XP Lamp",
+      "description": "Apply a carried Genie lamp to an exact selected skill with med-build cap checks and XP/item receipts.",
+      "file": "xp-lamp.lua"
     }
   ]
 }

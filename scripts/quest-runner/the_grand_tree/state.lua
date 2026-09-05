@@ -1,20 +1,5 @@
 local config = gc.require("grand_tree_config")
-
-local function carried(state, id)
-  local total = 0
-  for _, item in ipairs((state.inventory and state.inventory.items) or {}) do
-    if item.id == id then total = total + item.quantity end
-  end
-  return total
-end
-
-local function owned(state, id)
-  local total = carried(state, id)
-  for _, item in ipairs((state.equipment and state.equipment.items) or {}) do
-    if item.id == id then total = total + item.quantity end
-  end
-  return total
-end
+local item_queries = gc.require("shared_items")
 
 local function black_demon_loadout(state)
   local world = state.player and state.player.world
@@ -26,9 +11,9 @@ local function black_demon_loadout(state)
     world.y >= 9800 or world.x >= 10000)
   for _, requirement in ipairs(config.loadout) do
     if not requirement.transport or not transport_complete then
-      local quantity = owned(state, requirement.id)
+      local quantity = item_queries.carried_in(state, requirement.id)
       for _, id in ipairs(requirement.alternative_ids or {}) do
-        quantity = quantity + owned(state, id)
+        quantity = quantity + item_queries.carried_in(state, id)
       end
       if quantity < requirement.quantity then return false end
     end
@@ -67,7 +52,7 @@ local function resolve(state)
   if state.varp == 30 then return "talk_glough" end
   if state.varp == 40 then return "return_after_glough" end
   if state.varp == 50 then return "talk_charlie" end
-  if state.varp == 60 and carried(state, config.items.glough_journal) == 0 then
+  if state.varp == 60 and item_queries.quantity(state.inventory, config.items.glough_journal) == 0 then
     return "search_glough_journal"
   end
   if state.varp == 60 then return "confront_glough" end
@@ -88,10 +73,10 @@ local function resolve(state)
     return "unknown_stage"
   end
   if state.varp == 90 then return "return_lumber_order" end
-  if state.varp == 100 and carried(state, config.items.glough_key) == 0 then
+  if state.varp == 100 and item_queries.quantity(state.inventory, config.items.glough_key) == 0 then
     return "talk_anita"
   end
-  if state.varp == 100 and carried(state, config.items.invasion_plans) == 0 then
+  if state.varp == 100 and item_queries.quantity(state.inventory, config.items.invasion_plans) == 0 then
     return "find_invasion_plans"
   end
   if state.varp == 100 then return "invasion_plans_checkpoint" end
@@ -100,7 +85,7 @@ local function resolve(state)
   if state.varp == 130 and not black_demon_loadout(state) then return "prepare_black_demon" end
   if state.varp == 130 then return "fight_black_demon" end
   if state.varp == 140 then return "talk_king_after_demon" end
-  if state.varp == 150 and carried(state, config.items.daconia_rock) == 0 then
+  if state.varp == 150 and item_queries.quantity(state.inventory, config.items.daconia_rock) == 0 then
     return "find_daconia_rock"
   end
   if state.varp >= 150 then return "return_daconia_rock" end

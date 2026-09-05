@@ -1,8 +1,8 @@
 # Witch's House Quest Runner
 
-Status: implemented and completed live on genericBoss. The Quest API reports
+Historical live completion was recorded on genericBoss. The Quest API reports
 `finished`, varp 226 is 7, and the reward raised Hitpoints to level 25 at 8,184
-XP. Source modules live under `quest-runner/witchs_house/`.
+XP. Source modules live under `quest-runner/witchs_house/`. The current basement journeys use the native transport catalog and have offline validation; fresh live acceptance is pending.
 
 ## Decision
 
@@ -263,12 +263,12 @@ phase. Inventory checks include the bank where noted.
 | `accept` | Varp 0 and preflight passes | `Talk-to` Boy; select exact visible choices `What's the matter?`, `Ok, I'll see what I can do.`, and `Yes.` while tolerating the low-combat warning. | Varp becomes 1 / normalized state becomes in progress. |
 | `obtain_house_key` | Varp 1-2/5-6; outside house; no key in inventory/bank | `Look-under` plant 2867. | Inventory contains 2409. |
 | `enter_house` | Key exists; outside house/garden/shed | Open front door 2861. | Player enters house zone. |
-| `descend_basement` | Varp 1; no magnet; in house | Climb down ladder 24718. | East-basement zone. |
+| `descend_basement` | Varp 1; no magnet; in house | Journey to `(2906,9876,0)` through the native ladder handler. | East-basement zone. |
 | `equip_gloves` | East basement; gloves carried but not worn | Inventory `Wear`. | Equipment contains 1059. |
 | `open_gate` | East basement; gloves equipped | Open gate 2866. | West-basement zone. If HP falls, the glove postcondition was false: stop and heal, never retry blindly. |
 | `open_cupboard` | West basement; magnet absent; object 2868 visible | `Open`. | Object 2869 appears. |
 | `obtain_magnet` | West basement; magnet absent; object 2869 visible | `Search`. | Inventory contains 2410 and/or varp becomes 2. |
-| `return_upstairs` | Magnet exists; in basement | Climb up 24717. | House zone. |
+| `return_upstairs` | Magnet exists; in basement | Journey to `(2906,3476,0)` through the native ladder handler. | House zone. |
 | `lure_mouse` | Varp 2; house zone; cheese and magnet present | In one break-free critical section: cheese-on-hole 2870, wait for mouse 4000, then magnet-on-NPC. | Varp becomes 3. On mouse timeout, confirm one cheese consumed; permit one retry with the second cheese, then stop. |
 | `diary_checkpoint` | Varp 3 | Take diary 2408 at `(2903,3471,0)` if absent, `Read`, traverse/close its interface as required. | Varp becomes exactly 5. Never enter the garden on item possession alone. |
 | `garden_to_fountain` | Varp 5; shed key absent; outside shed | Execute only validated cover-to-cover hints, rechecking witch 3995 before each segment; `Check` fountain 2864. | Inventory contains 2411. Caught/teleported: recompute varp and items; never assume the checkpoint survived. |
@@ -307,40 +307,25 @@ phase. Inventory checks include the bank where noted.
 
 ## Reusable GenericClient capabilities
 
-The capabilities shared directly with the Waterfall runner should be built
-once in the plugin core:
+The runner uses scripting API 3 and the same snapshot, movement, dialogue,
+bank, item and safety interfaces as Waterfall. Witch's House also uses
+`item.use_on_npc` and exact-target combat. Native input confirms dispatch;
+quest-specific predicates confirm the resulting mouse, garden and combat state.
 
-1. `quest.state`: normalized quest state plus script-selected raw varps and
-   varbits, read on the client thread.
-2. `scene.objects`, `scene.npcs`, and `scene.ground_items`: enumerate all
-   matching live entities with ID, name, WorldPoint, footprint, orientation,
-   actions, and canvas/minimap visibility.
-3. `object.interact`, `npc.interact`, `ground_item.take`, `item.interact`,
-   `item.use_on_object`, and `item.use_on_npc`: semantic action selection through
-   the synthetic cursor, never menu indexes.
-4. `dialogue`: inspect Continue/choice widgets and choose exact visible text
-   while tolerating warning pages and variable page counts.
-5. `bank.loadout`: deposit/withdraw exact quantities, equip/unequip, honor the
-   five-million-coin reserve, and verify the result before closing.
-6. `player.vitals`: current/max HP, run energy, run state, animation,
-   interacting actor, movement destination, and incoming hitsplats.
-7. `food.eat`: select approved food and verify item consumption plus HP change.
-8. `combat.cast`: select the configured spell, target an exact NPC ID/footprint,
-   and verify attack/transition state without owning quest phase logic.
-9. `critical_section`: suppress all behavior breaks for a bounded operation
-   while retaining cancellation and safety monitors.
-10. `wait.until`: explicit game-tick postconditions with bounded timeout and a
-    structured receipt; wall-clock sleeps are never proof of success.
+`gc.intent(name, fn)` groups acceptance dialogue, cheese-to-magnet input and
+diary handling. Their long approaches stay outside the scope. Exposed garden,
+combat and escape operations retain their explicit policy and safety settings.
+Lua waits for bounded game-tick postconditions through the shared wait helper.
 
-Witch's House adds only two primitives beyond Waterfall's existing minimum:
-item-on-NPC and exact-NPC combat. The quest-specific Lua script owns varp 226,
-all IDs and zones, dialogue strings, garden route hints, relative safespot
-logic, form order, thresholds, loadout, and recovery precedence.
+The quest module owns varp 226, IDs/zones, dialogue choices, required garden
+corridors, relative safespots, form order, thresholds, loadout and recovery
+precedence. The client owns native target resolution, semantic boundaries,
+cancellable input, navigation and forced healing.
 
 ## Acceptance result
 
 The reducer, semantic interaction surfaces, JIT loadout, garden controller,
 combat controller, completion flow, and installed-script migration have
-automated coverage. The complete live receipt is recorded above. A restart at
+automated coverage. The historical live receipt is recorded above; current API 3 transport and behavior changes still require fresh live acceptance. A restart at
 varp 5 or 6 remains state-derived: it does not use a local form counter, and a
 completed account terminates without repeating any quest interaction.

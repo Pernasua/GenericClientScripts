@@ -1,11 +1,7 @@
 local config = gc.require("config")
+local geometry = gc.require("shared_geometry")
 
 local obstacles = config.course.obstacles
-
-local function distance(a, b)
-  if not a or a.plane ~= b.plane then return 99999 end
-  return math.max(math.abs(a.x - b.x), math.abs(a.y - b.y))
-end
 
 local function resolve(player)
   local world = player.world
@@ -31,7 +27,7 @@ local function drain_level_dialogue()
     end
     local receipt = gc.await {
       action = { type = "dialogue.continue" },
-      breaks = false,
+      policy = { breaks = false, cursor_release = "none", fidget = "none" },
       timeout = { game_ticks = 20 },
     }
     if receipt.status ~= "dispatched" then return nil, receipt end
@@ -59,7 +55,7 @@ local function perform(key)
   local obstacle = obstacles[key]
   if not obstacle then return nil, { status = "unknown_agility_obstacle", key = key } end
   local approach_within = obstacle.approach_within or 1
-  if obstacle.approach and distance(gc.read("player").world, obstacle.approach) > approach_within then
+  if obstacle.approach and geometry.distance(gc.read("player").world, obstacle.approach) > approach_within then
     local approached = gc.await {
       action = {
         type = "walk.to",
@@ -67,7 +63,6 @@ local function perform(key)
         within = approach_within,
         run = true,
       },
-      breaks = true,
       timeout = { game_ticks = 120 },
     }
     if approached.status ~= "arrived" then
@@ -98,7 +93,6 @@ local function perform(key)
         world = target.world,
         within = 24,
       },
-      breaks = true,
       timeout = { game_ticks = 40 },
     }
     if receipt.status == "dispatched" then break end

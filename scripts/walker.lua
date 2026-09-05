@@ -79,7 +79,7 @@ return {
         destination = place.destination,
         within = place.within,
       },
-      timeout = { game_ticks = 600 },
+      timeout = { game_ticks = 1800 },
     }
 
     if result.status == "arrived" then
@@ -97,7 +97,7 @@ return {
 
     local idle = gc.await {
       action = { type = "mouse.offscreen" },
-      breaks = false,
+      policy = { breaks = false, cursor_release = "none", fidget = "none" },
     }
     gc.log(result.status == "arrived" and "info" or "error", "walker-complete", {
       place = place.label,

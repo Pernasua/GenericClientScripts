@@ -1,4 +1,7 @@
 local config = gc.require("fight_arena_config")
+local equipment_actions = gc.require("shared_equipment")
+local geometry = gc.require("shared_geometry")
+local movement = gc.require("shared_movement")
 local interact = gc.require("fight_arena_interactions")
 
 local encounters = {
@@ -18,7 +21,7 @@ local function drain_continue_dialogue()
     if dialogue.type ~= "continue" then return true end
     local continued = gc.await {
       action = { type = "dialogue.continue" },
-      breaks = false,
+      policy = { breaks = false, cursor_release = "none", fidget = "none" },
       timeout = { game_ticks = 20 },
     }
     if continued.status ~= "dispatched" then return false, continued end
@@ -27,33 +30,17 @@ local function drain_continue_dialogue()
   return gc.read("dialogue").type ~= "continue"
 end
 
-local function equip_staff()
-  if interact.quantity(gc.read("equipment"), config.items.staff_of_air) > 0 then return true end
-  if interact.quantity(gc.read("inventory"), config.items.staff_of_air) == 0 then
-    return nil, { status = "fight_arena_staff_missing" }
-  end
-  local equipped = gc.await {
-    action = { type = "item.interact", id = config.items.staff_of_air, action = "Wield" },
-    breaks = false,
-    timeout = { game_ticks = 20 },
-  }
-  if equipped.status ~= "dispatched" then
-    return nil, { status = "fight_arena_staff_equip_failed", receipt = equipped }
-  end
-  if not interact.wait_for(function()
-    return interact.quantity(gc.read("equipment"), config.items.staff_of_air) > 0
-  end, 12) then
-    return nil, { status = "fight_arena_staff_equip_unverified", receipt = equipped }
-  end
-  return true
-end
-
 local function configure()
-  local equipped, failure = equip_staff()
-  if not equipped then return nil, failure end
+  local equipped = equipment_actions.equip(
+    config.items.staff_of_air,
+    "Wield",
+    { timeout_ticks = 20, verify_ticks = 12 })
+  if equipped.status ~= "complete" and equipped.status ~= "unchanged" then
+    return nil, equipped
+  end
   local autocast = gc.await {
     action = { type = "combat.set_autocast", spell = "Earth Bolt" },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
     timeout = { game_ticks = 30 },
   }
   if autocast.status ~= "set" and autocast.status ~= "unchanged" then
@@ -73,7 +60,7 @@ local function attack(encounter)
   end
   local attacked = gc.await {
     action = { type = "npc.interact", id = target.id, action = "Attack", within = 24 },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
     timeout = { game_ticks = 40 },
   }
   if attacked.status ~= "dispatched" then
@@ -98,14 +85,17 @@ local function position_safespot(encounter)
     local best = nil
     local best_distance = nil
     for _, candidate in ipairs(mapping.matches or {}) do
-      local candidate_distance = interact.distance(player.world, candidate)
+      local candidate_distance = geometry.distance(player.world, candidate)
       if best_distance == nil or candidate_distance < best_distance then
         best = candidate
         best_distance = candidate_distance
       end
     end
     if best then
-      local positioned = interact.walk(best, 0, false, 120)
+      local positioned = movement.walk(best, 0, {
+        ticks = 120,
+        policy = { breaks = false, cursor_release = "none", fidget = "none" },
+      })
       if positioned.status ~= "arrived" then
         return nil, {
           status = "fight_arena_instance_safespot_failed",
@@ -134,7 +124,10 @@ local function position_safespot(encounter)
     }
   end
 
-  local positioned = interact.walk(config.points.arena_safespot, 0, false, 120)
+  local positioned = movement.walk(config.points.arena_safespot, 0, {
+    ticks = 120,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
+  })
   if positioned.status ~= "arrived" then
     return nil, {
       status = "fight_arena_safespot_failed",
@@ -156,7 +149,7 @@ local function quick_escape()
       world = door.world,
       within = 12,
     },
-    breaks = false,
+    policy = { breaks = false, cursor_release = "none", fidget = "none" },
     timeout = { game_ticks = 40 },
   }
   if escaped.status ~= "dispatched" then return escaped end

@@ -1,21 +1,10 @@
 local config = gc.require("tree_gnome_config")
-local shared = gc.require("shared_state")
-
-local function in_zone(world, zone)
-  return world and world.plane == zone.plane and world.x >= zone.x1 and world.x <= zone.x2 and
-    world.y >= zone.y1 and world.y <= zone.y2
-end
-
-local function carried(state, id)
-  return shared.quantity(state.inventory, id) + shared.quantity(state.equipment, id)
-end
-
-local function missing(state, loadout)
-  return #shared.missing_carried_items(state, loadout) > 0
-end
+local geometry = gc.require("shared_geometry")
+local item_queries = gc.require("shared_items")
+local loadouts = gc.require("shared_loadouts")
 
 local function set_missing(state, loadout)
-  state.missing = shared.missing_items(state, loadout)
+  state.missing = loadouts.missing(state, loadout)
 end
 
 local function orbs_on_ground()
@@ -43,7 +32,7 @@ local function resolve(state)
 
   local world = state.player.world
   if state.varp == 0 then
-    if missing(state, config.initial_loadout) then
+    if #loadouts.missing_carried(state, config.initial_loadout) > 0 then
       set_missing(state, config.initial_loadout)
       return "loadout_required"
     end
@@ -51,7 +40,7 @@ local function resolve(state)
   end
   if state.varp == 1 then return "talk_montai" end
   if state.varp == 2 then
-    if carried(state, config.items.logs) < 6 then
+    if item_queries.carried_in(state, config.items.logs) < 6 then
       set_missing(state, config.initial_loadout)
       return "loadout_required"
     end
@@ -65,27 +54,27 @@ local function resolve(state)
     return "fire_ballista"
   end
   if state.varp == 5 then
-    if carried(state, config.items.first_orb) > 0 then return "return_first_orb" end
-    if in_zone(world, config.zones.tower_upstairs) then return "search_orb_chest" end
-    if in_zone(world, config.zones.tower_ground) or crumbled_wall_observed() then
+    if item_queries.carried_in(state, config.items.first_orb) > 0 then return "return_first_orb" end
+    if geometry.in_zone(world, config.zones.tower_upstairs) then return "search_orb_chest" end
+    if geometry.in_zone(world, config.zones.tower_ground) or crumbled_wall_observed() then
       return "enter_orb_tower"
     end
     return "report_ballista"
   end
   if state.varp == 6 then return "return_first_orb" end
   if state.varp == 7 then
-    if carried(state, config.items.remaining_orbs) > 0 then return "return_orbs" end
+    if item_queries.carried_in(state, config.items.remaining_orbs) > 0 then return "return_orbs" end
     if orbs_on_ground() then return "take_orbs" end
-    if missing(state, config.combat_minimum) then
+    if #loadouts.missing_carried(state, config.combat_minimum) > 0 then
       set_missing(state, config.combat_loadout)
       return "combat_loadout_required"
     end
     return "fight_warlord"
   end
   if state.varp == 8 then
-    if carried(state, config.items.remaining_orbs) > 0 then return "return_orbs" end
+    if item_queries.carried_in(state, config.items.remaining_orbs) > 0 then return "return_orbs" end
     if orbs_on_ground() then return "take_orbs" end
-    if in_zone(world, config.zones.village) and
+    if geometry.in_zone(world, config.zones.village) and
       state.varbits[config.varbits.bolren_got_orbs] >= 1 then
       return "finish_dialogue"
     end
@@ -94,4 +83,4 @@ local function resolve(state)
   return "unknown_stage"
 end
 
-return { resolve = resolve, in_zone = in_zone }
+return { resolve = resolve }

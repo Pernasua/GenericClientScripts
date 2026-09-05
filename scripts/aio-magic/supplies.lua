@@ -1,31 +1,16 @@
 local config = gc.require("config")
-
-local function quantity(container, id)
-  if not container or not container.items then
-    return 0
-  end
-  local total = 0
-  for _, item in ipairs(container.items) do
-    if item.id == id then
-      total = total + item.quantity
-    end
-  end
-  return total
-end
+local item_queries = gc.require("shared_items")
+local loadouts = gc.require("shared_loadouts")
 
 local function has_equipped(id)
-  return quantity(gc.read("equipment"), id) > 0
+  return item_queries.quantity(gc.read("equipment"), id) > 0
 end
 
 local function has_loadout(plan)
-  local inventory = gc.read("inventory")
-  local equipment = gc.read("equipment")
-  for _, item in ipairs(plan) do
-    if quantity(inventory, item.id) + quantity(equipment, item.id) < item.quantity then
-      return false
-    end
-  end
-  return true
+  return #loadouts.missing_carried({
+    inventory = gc.read("inventory"),
+    equipment = gc.read("equipment"),
+  }, plan) == 0
 end
 
 local function casts_to(cursor_xp, ceiling_xp, required_xp, base_xp)
@@ -36,18 +21,30 @@ local function casts_to(cursor_xp, ceiling_xp, required_xp, base_xp)
   return math.ceil((stage_end - cursor_xp) / base_xp), stage_end
 end
 
-local function add_runes(plan, id, name, quantity_needed)
-  if quantity_needed > 0 then
-    table.insert(plan, {
-      id = id,
-      name = name,
-      quantity = quantity_needed,
-      maximum_unit_price = 10,
-    })
+local function spell_for_level(level)
+  for index = #config.spells, 1, -1 do
+    local spell = config.spells[index]
+    if level >= spell.minimum_level then return spell end
   end
+  error("No Magic spell configured for level " .. tostring(level))
 end
 
-local function plan_for(target_level, current_magic)
+local function add_rune(runes, rune, casts)
+  if casts <= 0 then return end
+  local planned = runes[rune.id]
+  if not planned then
+    planned = {
+      id = rune.id,
+      name = rune.name,
+      quantity = 0,
+      maximum_unit_price = rune.maximum_unit_price,
+    }
+    runes[rune.id] = planned
+  end
+  planned.quantity = planned.quantity + casts * rune.quantity
+end
+
+local function plan_for(target_level, current_magic, required_xp_override)
   local plan = {}
   for _, item in ipairs(assert(config.plans[target_level], "Missing supply plan")) do
     table.insert(plan, {
@@ -58,36 +55,31 @@ local function plan_for(target_level, current_magic)
     })
   end
 
-  local required_xp = assert(config.target_xp[target_level], "Missing target XP")
+  local required_xp = required_xp_override or
+    assert(config.target_xp[target_level], "Missing target XP")
   local cursor_xp = current_magic.xp
-  local mind_runes = 0
-  local water_runes = 0
-  local earth_runes = 0
-  local air_runes = 0
-  local casts
-
-  casts, cursor_xp = casts_to(cursor_xp, 388, required_xp, 5.5)
-  mind_runes = mind_runes + casts
-  casts, cursor_xp = casts_to(cursor_xp, 969, required_xp, 7.5)
-  mind_runes = mind_runes + casts
-  water_runes = water_runes + casts
-  casts, cursor_xp = casts_to(cursor_xp, 1833, required_xp, 9.5)
-  mind_runes = mind_runes + casts
-  earth_runes = earth_runes + casts * 2
-  casts = casts_to(cursor_xp, required_xp, required_xp, 11.5)
-  mind_runes = mind_runes + casts
-  air_runes = air_runes + casts * 2
-
-  add_runes(plan, 558, "Mind rune", mind_runes)
-  add_runes(plan, 555, "Water rune", water_runes)
-  add_runes(plan, 557, "Earth rune", earth_runes)
-  add_runes(plan, 556, "Air rune", air_runes)
+  local runes = {}
+  for index, spell in ipairs(config.spells) do
+    local next_spell = config.spells[index + 1]
+    local ceiling_xp = next_spell and next_spell.unlock_xp or required_xp
+    local casts
+    casts, cursor_xp = casts_to(cursor_xp, ceiling_xp, required_xp, spell.base_xp)
+    for _, rune in ipairs(spell.runes) do add_rune(runes, rune, casts) end
+  end
+  for _, spell in ipairs(config.spells) do
+    for _, rune in ipairs(spell.runes) do
+      if runes[rune.id] then
+        table.insert(plan, runes[rune.id])
+        runes[rune.id] = nil
+      end
+    end
+  end
   return plan
 end
 
 return {
-  quantity = quantity,
   has_equipped = has_equipped,
   has_loadout = has_loadout,
   plan_for = plan_for,
+  spell_for_level = spell_for_level,
 }
