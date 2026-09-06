@@ -24,8 +24,10 @@ import org.dreambot.api.wrappers.interactive.NPC;
 
 @ScriptManifest(name="AIO Thieving Trainer",author="GenericClient",category=Category.THIEVING,version=1,
 	description="Train Thieving to level 25 at the Ardougne bakery and bank the loot.")
-@ScriptSettings(id="aio-thieving",inputs=@ScriptSettings.Input(id="target_level",label="Target level",
-	choices={"25"},defaultValue="25"),actions=@ScriptSettings.Button(id="stop_after_steal",label="Stop after steal"))
+@ScriptSettings(id="aio-thieving",inputs={
+	@ScriptSettings.Input(id="target_level",label="Target level",choices={"25"},defaultValue="25"),
+	@ScriptSettings.Input(id="method",label="Method",choices={"auto","ardougne_bakery"},labels={"Auto","East Ardougne bakery"},defaultValue="auto")
+},actions=@ScriptSettings.Button(id="stop_after_steal",label="Stop after steal"))
 public final class ThievingTrainer extends WorkflowScript
 {
 	private static final Tile MARKET = new Tile(2668,3310);
@@ -66,7 +68,7 @@ public final class ThievingTrainer extends WorkflowScript
 		Travel.westernTraining(MARKET, 5);
 		GameObject stall = GameObjects.closest(11730);
 		require(stall != null, "Bakery stall was not observed");
-		NPC baker = NPCs.closest(npc -> npc.getName().equals("Baker") && npc.distance(stall) <= 15);
+		NPC baker = NPCs.closest(npc -> npc.getName().equals("Baker") && npc.distance(stall) <= 15, stall.getTile());
 		require(baker != null, "Baker was not observed");
 		Travel.to(baker.getTile(), 0);
 		require(stall() != null, "Safe bakery position was not reached");

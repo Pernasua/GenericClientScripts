@@ -20,7 +20,8 @@ import org.dreambot.api.wrappers.interactive.NPC;
 	description="Train Attack, Strength, or Defence on Lumbridge goblins through level 30.")
 @ScriptSettings(id="aio-melee",inputs={
 	@ScriptSettings.Input(id="skill",label="Skill",choices={"attack","strength","defence"},labels={"Attack","Strength","Defence"},defaultValue="attack"),
-	@ScriptSettings.Input(id="target_level",label="Target level",choices={"2","5","10","20","30"},defaultValue="2")
+	@ScriptSettings.Input(id="target_level",label="Target level",choices={"2","5","10","20","30"},defaultValue="2"),
+	@ScriptSettings.Input(id="method",label="Method",choices={"auto","lumbridge_goblins"},labels={"Auto","Lumbridge goblins"},defaultValue="auto")
 },actions=@ScriptSettings.Button(id="stop_after_kill",label="Stop after kill"))
 public final class MeleeTrainer extends WorkflowScript
 {

@@ -165,7 +165,11 @@ public class CatalogEnvironment implements ScriptEnvironment
 		switch (id)
 		{
 			case 536:return "Dragon bones";
+			case 1381:return "Staff of air";
 			case 1387:return "Staff of fire";
+			case 1993:return "Jug of wine";
+			case 558:return "Mind rune";
+			case 557:return "Earth rune";
 			case 561:return "Nature rune";
 			case 890:return "Adamant arrow";
 			case 440:return "Iron ore";
@@ -174,7 +178,12 @@ public class CatalogEnvironment implements ScriptEnvironment
 			default:throw new AssertionError("Unconfigured item " + id);
 		}
 	}
-	private List<String> itemActions(int id) { return List.of(id == 536 ? "Bury" : id == 1387 ? "Wield" : "Use"); }
+	private List<String> itemActions(int id)
+	{
+		if (id == 536) return List.of("Bury");
+		if (id == 1381 || id == 1387) return List.of("Wield");
+		return List.of(id == 1993 ? "Drink" : "Use");
+	}
 
 	@Override public void sleep(long millis)
 	{

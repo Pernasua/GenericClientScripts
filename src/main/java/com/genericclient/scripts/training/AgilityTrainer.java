@@ -18,8 +18,10 @@ import org.dreambot.api.wrappers.interactive.GameObject;
 
 @ScriptManifest(name="AIO Agility Trainer",author="GenericClient",category=Category.AGILITY,version=1,
 	description="Train Agility on the Gnome Stronghold course through level 25.")
-@ScriptSettings(id="aio-agility",inputs=@ScriptSettings.Input(id="target_level",label="Target level",
-	choices={"10","20","25"},defaultValue="10"),actions=@ScriptSettings.Button(id="stop_after_obstacle",label="Stop after obstacle"))
+@ScriptSettings(id="aio-agility",inputs={
+	@ScriptSettings.Input(id="target_level",label="Target level",choices={"10","20","25"},defaultValue="25"),
+	@ScriptSettings.Input(id="method",label="Method",choices={"auto","gnome_stronghold"},labels={"Auto","Gnome Stronghold"},defaultValue="auto")
+},actions=@ScriptSettings.Button(id="stop_after_obstacle",label="Stop after obstacle"))
 public final class AgilityTrainer extends WorkflowScript
 {
 	private static final Obstacle[] OBSTACLES = {

@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 import org.dreambot.api.methods.container.impl.Inventory;
 import org.dreambot.api.methods.dialogues.Dialogues;
 import org.dreambot.api.methods.interactive.NPCs;
@@ -84,37 +85,39 @@ public final class MagicTrainer extends WorkflowScript
 		Automation.phase("magic.port_sarim_jail.arrived");
 		Normal configured = null;
 		int failures = 0;
-		while (Skills.getExperience(Skill.MAGIC) < goal && !stopRequested)
+		try
 		{
-			if (Dialogues.canContinue()) require(Dialogues.continueDialogue(), "Combat dialogue did not continue");
-			CombatSpell current = spell();
-			Supplies.equip(current.staff);
-			if (configured != current.spell)
+			while (Skills.getExperience(Skill.MAGIC) < goal && !pollStop())
 			{
-				require(Magic.setAutocastSpell(current.spell), "Autocast could not be configured");
-				configured = current.spell;
+				if (Dialogues.canContinue()) require(Dialogues.continueDialogue(), "Combat dialogue did not continue");
+				CombatSpell current = spell();
+				Supplies.equip(current.staff);
+				if (configured != current.spell)
+				{
+					require(Magic.setAutocastSpell(current.spell), "Autocast could not be configured");
+					configured = current.spell;
+				}
+				for (Map.Entry<Integer, Integer> rune : current.runes.entrySet())
+					require(Inventory.count(rune.getKey()) >= rune.getValue(), "Combat runes exhausted");
+				NPC npc = awaitTarget();
+				if (pollStop()) break;
+				Progress.training(Skill.MAGIC, target, current.spell.name());
+				int before = Skills.getExperience(Skill.MAGIC);
+				if (!npc.interact("Attack"))
+				{
+					require(++failures < 5, "Repeated combat interaction failures");
+					Sleep.sleepTicks(2);
+					continue;
+				}
+				int observed = observeCombat(goal,before);
+				failures = observed > before ? 0 : failures + 1;
+				require(failures < 5, "Combat casts did not produce Magic XP");
 			}
-			for (Map.Entry<Integer, Integer> rune : current.runes.entrySet())
-				require(Inventory.count(rune.getKey()) >= rune.getValue(), "Combat runes exhausted");
-			NPC npc = availableTarget();
-			if (npc == null)
-			{
-				require(Sleep.sleepUntil(() -> availableTarget() != null, 60_000), "No eligible combat target appeared");
-				npc = availableTarget();
-			}
-			Progress.training(Skill.MAGIC, target, current.spell.name());
-			int before = Skills.getExperience(Skill.MAGIC);
-			if (!npc.interact("Attack"))
-			{
-				require(++failures < 5, "Repeated combat interaction failures");
-				Sleep.sleepTicks(2);
-				continue;
-			}
-			int observed = observeCombat(goal,before);
-			failures = observed > before ? 0 : failures + 1;
-			require(failures < 5, "Combat casts did not produce Magic XP");
 		}
-		Travel.to(DISENGAGE, 0);
+		finally
+		{
+			Travel.to(DISENGAGE, 0);
+		}
 	}
 
 	private int observeCombat(int goal, int before)
@@ -122,17 +125,40 @@ public final class MagicTrainer extends WorkflowScript
 		int quiet = 0;
 		int idle = 0;
 		int observed = before;
+		int stopXp = before;
 		for (int tick = 0; tick < 80; tick++)
 		{
 			Sleep.sleepTicks(1);
 			int xp = Skills.getExperience(Skill.MAGIC);
+			if (!stopRequested && pollStop())
+			{
+				stopXp = observed;
+			}
 			quiet = xp > observed ? 0 : quiet + 1;
 			observed = xp;
 			idle = com.genericclient.scripts.shared.WorkflowScript.player().isInCombat() ? 0 : idle + 1;
-			stopRequested |= "stop_after_cast".equals(Automation.nextAction());
-			if (xp >= goal || stopRequested || idle >= 2 || quiet >= 12) break;
+			boolean castObserved = xp > before;
+			if (xp >= goal || stopRequested && xp > stopXp || idle >= (castObserved ? 2 : 5) || quiet >= 12) break;
 		}
 		return observed;
+	}
+
+	private boolean pollStop()
+	{
+		if (!stopRequested) stopRequested = "stop_after_cast".equals(Automation.nextAction());
+		return stopRequested;
+	}
+
+	private NPC awaitTarget()
+	{
+		AtomicReference<NPC> candidate = new AtomicReference<>();
+		require(Sleep.sleepUntil(() ->
+		{
+			if (pollStop()) return true;
+			candidate.set(availableTarget());
+			return candidate.get() != null;
+		}, 60_000), "No eligible combat target appeared");
+		return candidate.get();
 	}
 
 	private void trainAtBank()
@@ -144,7 +170,7 @@ public final class MagicTrainer extends WorkflowScript
 		int material = superheat ? 440 : 890;
 		int casts = (int) Math.ceil((targetXp - Skills.getExperience(Skill.MAGIC)) / spell.getExperience());
 		Supplies.ensure(List.of(supply(1387, 1), supply(561, casts), supply(material, casts)), purchase);
-		while (Skills.getExperience(Skill.MAGIC) < targetXp && !stopRequested)
+		while (Skills.getExperience(Skill.MAGIC) < targetXp && !pollStop())
 		{
 			int remaining = (int) Math.ceil((targetXp - Skills.getExperience(Skill.MAGIC)) / spell.getExperience());
 			int batch = superheat ? Math.min(26, remaining) : remaining;
@@ -156,7 +182,7 @@ public final class MagicTrainer extends WorkflowScript
 			});
 			Automation.activity("skilling");
 			Automation.phase(superheat ? "magic.superheat.bank" : "magic.low_alchemy.bank");
-			while (Inventory.contains(material) && Skills.getExperience(Skill.MAGIC) < targetXp && !stopRequested)
+			while (Inventory.contains(material) && Skills.getExperience(Skill.MAGIC) < targetXp && !pollStop())
 			{
 				int beforeXp = Skills.getExperience(Skill.MAGIC);
 				int beforeQuantity = Inventory.count(material);
@@ -165,7 +191,7 @@ public final class MagicTrainer extends WorkflowScript
 				require(Magic.castSpellOn(spell, item), "Spell interaction failed");
 				await(() -> Skills.getExperience(Skill.MAGIC) > beforeXp && Inventory.count(material) < beforeQuantity,
 					6000, "Spell XP and material consumption were not observed");
-				stopRequested |= "stop_after_cast".equals(Automation.nextAction());
+				pollStop();
 			}
 		}
 	}
