@@ -76,7 +76,7 @@ Journey interruptions use `Navigation.walk(journey, interruptOn, continuation)`.
 ## Verification
 
 ```bash
-./gradlew test pmdMain pmdTest pmdRouteAudit -PgenericClientDir=../GenericClient
+./gradlew test pmdMain pmdTest pmdRouteAudit jar -PgenericClientDir=../GenericClient
 ../GenericClient/gradlew -p ../GenericClient routeAudit scriptCatalogAudit -PscriptCatalog="$PWD"
 ```
 
