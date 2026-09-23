@@ -68,8 +68,10 @@ public final class Molly extends WorkflowScript
 	private void openDoor()
 	{
 		GameObject door = GameObjects.closest(object -> object.getId() == 20817 && object.hasAction("Open"));
+		Tile start = player().getTile();
 		require(door != null && door.interact("Open"),"Molly's door did not open");
-		Sleep.sleepTicks(15);
+		// The door moves the player through only after the approach walk stops beside it, so the crossing ends on a new tile held for a full tick.
+		require(Sleep.sleepUntil(() -> !player().getTile().equals(start) && !player().isMoving(),() -> false,9000,600,2),"Molly's door was not crossed");
 	}
 	private int capture(int twin, long started)
 	{

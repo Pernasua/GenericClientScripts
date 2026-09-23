@@ -2,6 +2,8 @@ package com.genericclient.scripts.tools;
 
 import com.genericclient.script.Automation;
 import com.genericclient.script.ScriptSettings;
+import com.genericclient.script.SnapshotData;
+import com.genericclient.scripts.shared.WorkflowScript;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,13 +30,13 @@ public final class PrisonGuardObserver extends AbstractScript
 			NPC npc = NPCs.closest(id);
 			rows.put(id == 5247 ? "Trefaji" : "Aberab",npc == null ? "Out of view" : npc.getTile().toString());
 		}
-		rows.put("Player",com.genericclient.scripts.shared.WorkflowScript.player().getTile().toString());
+		rows.put("Player",WorkflowScript.player().getTile().toString());
 		Automation.overlay(rows);
 		Automation.markers(List.of(Map.of("npc_id",5247,"label","Trefaji","color","#ffb347"),
 			Map.of("npc_id",5248,"label","Aberab","color","#57d7ff")));
 		Map<String,Object> observation = Map.of("guards",rows,
-			"player",com.genericclient.script.SnapshotData.read("player"),
-			"dialogue",com.genericclient.script.SnapshotData.read("dialogue"));
+			"player",SnapshotData.read("player"),
+			"dialogue",SnapshotData.read("dialogue"));
 		if (!observation.equals(previous)) { log(observation); previous = observation; }
 		return 600;
 	}

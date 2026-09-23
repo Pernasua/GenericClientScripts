@@ -1,6 +1,6 @@
 # Romeo & Juliet and Goblin Diplomacy
 
-Both workflows run through the Java Quest Runner with `scope=complete` or
+Both workflows run through the Quest Runner with `scope=complete` or
 `scope=checkpoint`. Bank-only mode uses owned supplies; Grand Exchange mode
 retains the existing 5,000,000 gp reserve.
 
@@ -27,15 +27,15 @@ frame, and stopping without spending supplies.
 
 ## Live completion and validation
 
-On 2026-09-05, genericBoss completed both quests through the Java runner. The
-quest journal reports Romeo & Juliet finished at progress 100 and Goblin
+On 2026-09-05, a live account completed both quests through the runner. The
+quest journal reported Romeo & Juliet finished at progress 100 and Goblin
 Diplomacy finished at progress 6. The completion screens showed 33 total Quest
-Points. Crafting reached level 5 at 404 XP, and the gold bar reward remains in
-inventory. No Grand Exchange offers remain active.
+Points. Crafting reached level 5 at 404 XP, and the gold bar reward stayed in
+inventory. No Grand Exchange offers remained active.
 
-Both new quest implementations have 100% measured JaCoCo line, branch, method,
-and instruction coverage. Their focused PIT run killed all 110 mutations with
-none uncovered. Scenario coverage includes packed stage flags, stale dialogue
+The same day, both quest implementations measured 100% JaCoCo line, branch,
+method, and instruction coverage. Their focused PIT run killed all 110 mutations
+with none uncovered. Scenario coverage includes packed stage flags, stale dialogue
 pages, missing supplies, item changes during an intent boundary, pending orders,
 cutscene recovery, and completion before the scene finishes loading.
 

@@ -32,14 +32,14 @@ final class MonkeyTalisman
 			while (!auntNear() && Inventory.count(1963) < 5)
 			{
 				GameObject tree = GameObjects.closest(object -> object.getId() >= 4749 && object.getId() <= 4753 && object.hasAction("Search"));
-				QuestWorkflow.require(tree != null,"Banana tree was not observed");
+				WorkflowScript.require(tree != null,"Banana tree was not observed");
 				int before = Inventory.count(1963);
-				QuestWorkflow.require(tree.interact("Search"),"Banana search failed");
-				QuestWorkflow.await(() -> Inventory.count(1963) > before || auntNear(),20,"Banana search result was not observed");
+				WorkflowScript.require(tree.interact("Search"),"Banana search failed");
+				WorkflowScript.awaitTicks(() -> Inventory.count(1963) > before || auntNear(),20,"Banana search result was not observed");
 			}
 			hide();
 		}
-		QuestWorkflow.require(Inventory.count(1963) >= 5,"Five bananas were not obtained");
+		WorkflowScript.require(Inventory.count(1963) >= 5,"Five bananas were not obtained");
 		for (int window = 0; window < 12; window++)
 		{
 			waitForAunt();
@@ -73,7 +73,7 @@ final class MonkeyTalisman
 		reach(MonkeyMap.MONKEY_CHILD,3,40);
 		if (auntNear()) return;
 		NPC child = QuestWorkflow.npc(5268);
-		QuestWorkflow.require(child != null && child.interact("Talk-to"),"Monkey child dialogue failed");
+		WorkflowScript.require(child != null && child.interact("Talk-to"),"Monkey child dialogue failed");
 		boolean opened = false;
 		int closed = 0;
 		for (int tick = 0; tick < 100; tick++)
@@ -93,6 +93,6 @@ final class MonkeyTalisman
 		Automation.activity("questing",WorkflowScript.NO_DISCRETIONARY);
 		Map<String,Object> moved = Navigation.walk(new Navigation.Journey(destination,within).timeout(ticks),
 			Map.of("area",Map.of("name","prison","bounds",MonkeyAreas.PRISON_BOUNDS)),null);
-		QuestWorkflow.require("arrived".equals(moved.get("status")) && !MonkeyAreas.prison(),"Monkey child travel failed: " + moved);
+		WorkflowScript.require("arrived".equals(moved.get("status")) && !MonkeyAreas.prison(),"Monkey child travel failed: " + moved);
 	}
 }

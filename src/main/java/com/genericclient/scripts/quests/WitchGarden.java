@@ -37,9 +37,9 @@ final class WitchGarden
 	private void eastCover()
 	{
 		Automation.activity("questing",WorkflowScript.NO_DISCRETIONARY);
-		Travel.to(new Tile(2928,3456),0,"questing",WorkflowScript.NO_DISCRETIONARY);
+		Travel.to(WitchsHouse.OUTSIDE_GARDEN,0,"questing",WorkflowScript.NO_DISCRETIONARY);
 		move(2901,3464);
-		QuestWorkflow.await(() -> Walking.getRunEnergy() >= 20,100,"Garden run energy did not recover");
+		WorkflowScript.awaitTicks(() -> Walking.getRunEnergy() >= 20,100,"Garden run energy did not recover");
 		move(2901,3460); absent(); move(2908,3460); moving(false,2908);
 		move(2916,3460); position(x -> x <= 2910,50);
 		move(2924,3460); position(x -> x <= 2918,60);
@@ -49,7 +49,7 @@ final class WitchGarden
 	{
 		Travel.to(new Tile(x,y),0,"questing",WorkflowScript.NO_DISCRETIONARY);
 		Tile reached = QuestWorkflow.tile();
-		QuestWorkflow.require(reached.getX() >= 2900 && reached.getX() <= 2933 && reached.getY() >= 3459 && reached.getY() <= 3475,
+		WorkflowScript.require(reached.getX() >= 2900 && reached.getX() <= 2933 && reached.getY() >= 3459 && reached.getY() <= 3475,
 			"The witch caught the player");
 	}
 	private void absent()
@@ -79,7 +79,7 @@ final class WitchGarden
 	}
 	private void position(IntPredicate allowed, int ticks)
 	{
-		QuestWorkflow.await(() -> { NPC witch = NPCs.closest(3995); return witch != null && allowed.test(witch.getTile().getX()); },
+		WorkflowScript.awaitTicks(() -> { NPC witch = NPCs.closest(3995); return witch != null && allowed.test(witch.getTile().getX()); },
 			ticks,"Witch did not reach the required patrol position");
 	}
 }

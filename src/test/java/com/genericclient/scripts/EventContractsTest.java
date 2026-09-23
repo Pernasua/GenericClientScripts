@@ -21,11 +21,6 @@ public class EventContractsTest
         assertEquals(Map.of("status","solved"),game.result);
         assertEquals(2,game.gameInputs);
         assertEquals("general",game.activity);
-        assertEquals(Map.of("breaks",false,"cursor_release","none","fidget","none"),game.policy);
-        assertEquals(List.of("genie.reward"),game.intents.entries);
-        assertEquals(List.of("genie.reward"),game.intents.actions.get("npc.interact"));
-        assertEquals(List.of("genie.reward"),game.intents.actions.get("dialogue.continue"));
-        assertNull(game.intents.current);
     }
 
     @Test public void aRewardMessageWithoutTheNewLampDoesNotCompleteGenie()
@@ -35,7 +30,6 @@ public class EventContractsTest
         gift(game,() -> game.message("Your reward is: 1 x Lamp."));
         try { game.run(); fail("Missing lamp was accepted"); }
         catch (IllegalStateException expected) { assertEquals("Random-event reward was not observed",expected.getMessage()); }
-        assertNull(game.intents.current);
     }
 
     @Test public void giftsDoNotUseRewardsFromBeforeTheEventWasDetected()
@@ -50,16 +44,19 @@ public class EventContractsTest
             try { game.run(); fail("An old reward completed the new event"); }
             catch (IllegalStateException expected) { assertEquals("Random-event reward was not observed",expected.getMessage()); }
             assertEquals(2,game.gameInputs);
-            assertNull(game.intents.current);
         }
     }
 
-    @Test public void solverCannotClaimAnotherEventsNpc()
+    @Test public void solverClaimsOnlyItsOwnActiveEvent()
     {
-        EventScenario game=new EventScenario(new Genie(),375);
-        try { game.run(); fail("Different event owner was accepted"); }
-        catch (IllegalStateException expected) { assertEquals("Solver does not own this random event",expected.getMessage()); }
-        assertEquals(0,game.gameInputs);
+        for (boolean inactive : List.of(false,true))
+        {
+            EventScenario game=new EventScenario(new Genie(),inactive ? 326 : 375);
+            if (inactive) game.event.put("active",false);
+            try { game.run(); fail("A solver claimed an event it does not own"); }
+            catch (IllegalStateException expected) { assertEquals("Solver does not own this random event",expected.getMessage()); }
+            assertEquals(0,game.gameInputs);
+        }
     }
 
     @Test public void giftTalkUsesBothTheDetectedNpcIdAndIndex()
@@ -72,15 +69,6 @@ public class EventContractsTest
         game.run();
         assertEquals(Map.of("status","solved"),game.result);
         assertEquals(2,game.gameInputs);
-    }
-
-    @Test public void anInactiveEventCannotClaimItsPreviousNpc()
-    {
-        EventScenario game=new EventScenario(new Genie(),326);
-        game.event.put("active",false);
-        try { game.run(); fail("An inactive event retained solver ownership"); }
-        catch (IllegalStateException failure) { assertEquals("Solver does not own this random event",failure.getMessage()); }
-        assertEquals(0,game.gameInputs);
     }
 
     @Test public void rickWaitsForTheRewardAndDwarfForTheCompletedConversation()

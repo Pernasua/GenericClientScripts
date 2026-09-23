@@ -1,5 +1,8 @@
 package com.genericclient.scripts.quests;
 
+import static com.genericclient.scripts.shared.WorkflowScript.awaitTicks;
+import static com.genericclient.scripts.shared.WorkflowScript.require;
+
 import com.genericclient.script.Automation;
 import com.genericclient.script.ScriptScope;
 import com.genericclient.script.SnapshotData;
@@ -20,8 +23,6 @@ import org.dreambot.api.methods.magic.Magic;
 import org.dreambot.api.methods.magic.Normal;
 import org.dreambot.api.methods.map.Tile;
 import org.dreambot.api.methods.settings.PlayerSettings;
-import org.dreambot.api.methods.skills.Skill;
-import org.dreambot.api.methods.skills.Skills;
 import org.dreambot.api.utilities.Sleep;
 import org.dreambot.api.utilities.impl.Condition;
 import org.dreambot.api.wrappers.interactive.GameObject;
@@ -75,11 +76,6 @@ abstract class QuestWorkflow
 	int bit(int id) { return PlayerSettings.getBitValue(id); }
 	boolean finished() { return "finished".equals(SnapshotData.map(SnapshotData.read("quests").get(key)).get("state")); }
 	static Tile tile() { return WorkflowScript.player().getTile(); }
-	static void require(boolean value, String message) { if (!value) throw new IllegalStateException(message); }
-	static void await(Condition condition, int ticks, String message)
-	{
-		require(Sleep.sleepUntil(condition,ticks*600L),message);
-	}
 	static boolean carried(int id) { return Inventory.contains(id) || Equipment.contains(id); }
 	static NPC npc(int... ids) { return NPCs.closest(Arrays.stream(ids).boxed().toArray(Integer[]::new)); }
 	static GameObject object(int id, Tile point)
@@ -96,7 +92,7 @@ abstract class QuestWorkflow
 		if (point != null && point.getZ() == tile().getZ()) walk(point,1,hazardous);
 		GameObject target = object(id,point);
 		require(target != null && target.interact(action),"Quest object interaction failed: " + id + " " + action);
-		await(complete,50,"Quest object result was not observed: " + id);
+		awaitTicks(complete,50,"Quest object result was not observed: " + id);
 	}
 	void use(int item, int object, Tile point, Condition complete, boolean hazardous)
 	{
@@ -104,7 +100,7 @@ abstract class QuestWorkflow
 		GameObject target = object(object,point);
 		Item held = Inventory.get(item);
 		require(held != null && target != null && held.useOn(target),"Quest item use failed: " + item + " on " + object);
-		await(complete,50,"Quest item-use result was not observed");
+		awaitTicks(complete,50,"Quest item-use result was not observed");
 	}
 	void take(int id, Tile point)
 	{
@@ -112,7 +108,7 @@ abstract class QuestWorkflow
 		walk(point,5,false);
 		require(SnapshotData.action("ground_item.take",Map.of("id",id,"world",Map.of("x",point.getX(),"y",point.getY(),"plane",point.getZ()),"within",12)),
 			"Quest item could not be taken: " + id);
-		await(() -> Inventory.contains(id),30,"Quest item was not observed: " + id);
+		awaitTicks(() -> Inventory.contains(id),30,"Quest item was not observed: " + id);
 	}
 	void talk(int[] ids, Tile point, Condition complete, boolean hazardous, String... choices)
 	{
@@ -120,7 +116,8 @@ abstract class QuestWorkflow
 		if (point != null) walk(point,5,hazardous);
 		NPC approach = npc(ids);
 		require(approach != null,"Quest NPC was not found: " + Arrays.toString(ids));
-		walk(approach.getTile(),0,hazardous);
+		// The known area can leave a wall between the player and the NPC, and its own tile can be unreachable.
+		if (!QuestCombat.lineOfSight(approach)) walk(approach.getTile(),1,hazardous);
 		Automation.intent(key + ".talk", () ->
 		{
 			NPC target = NPCs.closest(candidate -> Arrays.stream(ids).anyMatch(id -> candidate.getId() == id) && candidate.hasAction("Talk-to"));
@@ -163,23 +160,20 @@ abstract class QuestWorkflow
 	}
 	void toExchange()
 	{
-		if (Travel.GRAND_EXCHANGE.distance() <= 2) return;
+		if (Travel.GRAND_EXCHANGE.distance() <= 8) return;
 		if (Jewellery.carried(Jewellery.Destination.GRAND_EXCHANGE)) Jewellery.teleport(Jewellery.Destination.GRAND_EXCHANGE);
 		else if (Jewellery.carried(Jewellery.Destination.BURTHORPE)) Jewellery.teleport(Jewellery.Destination.BURTHORPE);
 		else if (Jewellery.carried(Jewellery.Destination.EMIRS_ARENA)) Jewellery.teleport(Jewellery.Destination.EMIRS_ARENA);
 		else if (Travel.GRAND_EXCHANGE.distance() > 120) require(Magic.castSpell(Normal.HOME_TELEPORT),"Quest preparation needs a safe transport to a bank");
-		Travel.to(Travel.GRAND_EXCHANGE,2);
+		Travel.to(Travel.GRAND_EXCHANGE,8);
 	}
-	static Supply necklace() { return new Supply(3853,"Games necklace",1,1000,3855,3857,3859,3861,3863,3865,3867); }
-	static Supply duelingRing() { return new Supply(2552,"Ring of dueling",1,1000,2554,2556,2558,2560,2562,2564,2566); }
+	void leave(Jewellery.Destination destination, Tile walkTo)
+	{
+		if (Jewellery.carried(destination)) Jewellery.teleport(destination);
+		else walk(walkTo,1,true);
+	}
 	static Supply wine(int count) { return new Supply(1993,"Jug of wine",count,100); }
 	static Supply questItem(int id, String name) { return new Supply(id,name,1,0); }
-	void foodGuard(boolean allowOverheal)
-	{
-		require(SnapshotData.action("safety.configure",Map.of("minimum_hitpoints",Math.max(4,Skills.getRealLevel(Skill.HITPOINTS)/4),
-			"consumables",List.of(Map.of("id",1993,"action","Drink","heal_amount",11)),
-			"continue_after_consumable",true,"allow_overheal",allowOverheal)),"Quest food guard could not be configured");
-	}
 	static boolean message(long since, String fragment)
 	{
 		return SnapshotData.rows("messages",Map.of("since_tick",since,"limit",60)).stream()

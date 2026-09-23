@@ -1,7 +1,11 @@
 package com.genericclient.scripts.quests;
 
+import static com.genericclient.scripts.shared.WorkflowScript.awaitTicks;
+import static com.genericclient.scripts.shared.WorkflowScript.require;
+
 import org.dreambot.api.methods.settings.PlayerSettings;
 import com.genericclient.scripts.shared.Jewellery;
+import com.genericclient.scripts.shared.Safety;
 import com.genericclient.scripts.shared.Supplies;
 import com.genericclient.scripts.shared.Supply;
 import java.util.ArrayList;
@@ -13,6 +17,8 @@ import org.dreambot.api.methods.map.Area;
 import org.dreambot.api.methods.map.Tile;
 import org.dreambot.api.methods.skills.Skill;
 import org.dreambot.api.methods.skills.Skills;
+import org.dreambot.api.wrappers.interactive.GameObject;
+import org.dreambot.api.wrappers.items.Item;
 
 final class Waterfall extends QuestWorkflow
 {
@@ -32,7 +38,11 @@ final class Waterfall extends QuestWorkflow
 	private boolean finalPrepared;
 	Waterfall() { super("waterfall_quest"); }
 	@Override int stage() { return PlayerSettings.getConfig(65); }
-	@Override void validate() { require(Skills.getRealLevel(Skill.HITPOINTS) >= 15,"Waterfall requires at least 15 Hitpoints for this route"); foodGuard(true); }
+	@Override void validate()
+	{
+		require(Skills.getRealLevel(Skill.HITPOINTS) >= 15,"Waterfall requires at least 15 Hitpoints for this route");
+		Safety.guard(Math.max(4,Skills.getRealLevel(Skill.HITPOINTS)/4),Safety.wine(),true,null);
+	}
 	@Override int checkpoint()
 	{
 		if (finished()) return 7;
@@ -101,7 +111,7 @@ final class Waterfall extends QuestWorkflow
 	{
 		switch (phase)
 		{
-			case "prepare_initial": prepare(List.of(new Supply(954,"Rope",1,1000),necklace(),wine(6))); initialPrepared = true; break;
+			case "prepare_initial": prepare(List.of(new Supply(954,"Rope",1,1000),Jewellery.GAMES_NECKLACE,wine(6))); initialPrepared = true; break;
 			case "prepare_gnome": prepareGnome(); break;
 			case "prepare_tomb": prepareTomb(); break;
 			case "prepare_final": prepareFinal(); break;
@@ -115,19 +125,19 @@ final class Waterfall extends QuestWorkflow
 	}
 	private void prepareGnome()
 	{
-		List<Supply> stock = new ArrayList<>(List.of(duelingRing(),wine(10)));
+		List<Supply> stock = new ArrayList<>(List.of(Jewellery.DUELING_RING,wine(10)));
 		if (Supplies.owned(293) > 0) stock.add(questItem(293,"Key"));
 		prepare(stock); gnomePrepared = true;
 	}
 	private void prepareTomb()
 	{
-		List<Supply> stock = new ArrayList<>(List.of(questItem(294,"Glarial's pebble"),necklace(),wine(10)));
+		List<Supply> stock = new ArrayList<>(List.of(questItem(294,"Glarial's pebble"),Jewellery.GAMES_NECKLACE,wine(10)));
 		if (Supplies.owned(295) > 0) stock.add(questItem(295,"Glarial's amulet"));
 		prepare(stock); tombPrepared = true;
 	}
 	private void prepareFinal()
 	{
-		List<Supply> stock = new ArrayList<>(List.of(new Supply(954,"Rope",1,1000),necklace(),wine(8),
+		List<Supply> stock = new ArrayList<>(List.of(new Supply(954,"Rope",1,1000),Jewellery.GAMES_NECKLACE,wine(8),
 			new Supply(555,"Water rune",6,50),new Supply(556,"Air rune",6,50),new Supply(557,"Earth rune",6,50),
 			questItem(295,"Glarial's amulet"),questItem(296,"Glarial's urn")));
 		if (Supplies.owned(298) > 0) stock.add(questItem(298,"Key"));
@@ -137,11 +147,14 @@ final class Waterfall extends QuestWorkflow
 	{
 		if (new Tile(2559,3445).distance() > 200) Jewellery.teleport(Jewellery.Destination.BARBARIAN_OUTPOST);
 		walk(new Tile(2559,3445),3,false);
-		require(Inventory.get(294).useOn(GameObjects.closest(1992)),"Glarial's tomb could not be entered");
-		await(() -> TOMB.contains(tile()),30,"Glarial's tomb entry was not observed");
+		Item pebble = Inventory.get(294);
+		GameObject tomb = GameObjects.closest(1992);
+		require(pebble != null && tomb != null && pebble.useOn(tomb),"Glarial's tomb could not be entered");
+		awaitTicks(() -> TOMB.contains(tile()),30,"Glarial's tomb entry was not observed");
 	}
 	@Override void escape()
 	{
-		Jewellery.teleport(GNOME.contains(tile()) ? Jewellery.Destination.CASTLE_WARS : Jewellery.Destination.BURTHORPE);
+		if (GNOME.contains(tile())) leave(Jewellery.Destination.CASTLE_WARS,WaterfallNavigation.GNOME_SURFACE);
+		else leave(Jewellery.Destination.BURTHORPE,WaterfallNavigation.TOMB_SURFACE);
 	}
 }

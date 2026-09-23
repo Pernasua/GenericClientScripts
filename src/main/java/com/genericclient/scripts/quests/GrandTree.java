@@ -1,5 +1,8 @@
 package com.genericclient.scripts.quests;
 
+import static com.genericclient.scripts.shared.WorkflowScript.awaitTicks;
+import static com.genericclient.scripts.shared.WorkflowScript.require;
+
 import org.dreambot.api.methods.settings.PlayerSettings;
 import com.genericclient.script.Automation;
 import com.genericclient.scripts.shared.Jewellery;
@@ -11,6 +14,7 @@ import org.dreambot.api.methods.map.Tile;
 import org.dreambot.api.methods.skills.Skill;
 import org.dreambot.api.methods.skills.Skills;
 import org.dreambot.api.wrappers.interactive.GameObject;
+import org.dreambot.api.wrappers.items.Item;
 
 final class GrandTree extends QuestWorkflow
 {
@@ -61,7 +65,7 @@ final class GrandTree extends QuestWorkflow
 		if (List.of("prepare_combat","demon","cave_king","rock","return_rock").contains(phase)) { new GrandTreeFinale(this,travel).execute(phase); return; }
 		switch (phase)
 		{
-			case "prepare_travel": prepare(List.of(duelingRing())); travelPrepared = true; break;
+			case "prepare_travel": prepare(List.of(Jewellery.DUELING_RING)); travelPrepared = true; break;
 			case "start": travel.king(false); talk(GnomeTravel.KING,null,() -> stage() >= 10,false,"You seem worried, what's up?","Yes.","I'd be happy to help!"); break;
 			case "hazelmere": travel.hazelmere(); talk(new int[]{1422,13610},null,() -> stage() >= 20,false); break;
 			case "translation": travel.king(false); talk(GnomeTravel.KING,null,() -> stage() >= 30,false,"I think so!","A man came to me with the King's seal.","I gave the man Daconia rocks.","And Daconia rocks will kill the tree!","None of the above."); break;
@@ -89,9 +93,9 @@ final class GrandTree extends QuestWorkflow
 		{
 			GameObject gate = GameObjects.closest(object -> (object.getId() == 2438 || object.getId() == 2439) && object.hasAction("Open"));
 			require(gate != null && gate.interact("Open"),"Shipyard gate did not open");
-			dialogue(() -> SHIPYARD.contains(tile()),120,"Glough sent me.","Ka.","Lu.","Min.");			return null;
+			dialogue(() -> SHIPYARD.contains(tile()),120,"Glough sent me.","Ka.","Lu.","Min.");
+			return null;
 		});
-
 	}
 	private void searchContainer(int closedId, int openId, int item)
 	{
@@ -101,14 +105,14 @@ final class GrandTree extends QuestWorkflow
 			if (closed != null)
 			{
 				require(closed.interact("Open"),"Quest container did not open");
-				await(() -> GameObjects.closest(openId) != null || Inventory.contains(item),30,"Quest container did not change");
+				awaitTicks(() -> GameObjects.closest(openId) != null || Inventory.contains(item),30,"Quest container did not change");
 			}
 			if (Inventory.contains(item)) return null;
 			GameObject open = GameObjects.closest(openId);
 			require(open != null && open.interact("Search"),"Quest container search failed");
-			await(() -> Inventory.contains(item),30,"Quest item was not obtained: " + item);			return null;
+			awaitTicks(() -> Inventory.contains(item),30,"Quest item was not obtained: " + item);
+			return null;
 		});
-
 	}
 	private void twigs()
 	{
@@ -118,15 +122,16 @@ final class GrandTree extends QuestWorkflow
 			for (int index = 0; index < 4; index++)
 			{
 				int item = 789+index;
-				if (!Inventory.contains(item)) continue;
+				Item twig = Inventory.get(item);
+				if (twig == null) continue;
 				GameObject pillar = GameObjects.closest(2440+index);
-				require(pillar != null && Inventory.get(item).useOn(pillar),"Tuzo twig placement failed");
-				await(() -> !Inventory.contains(item),20,"Tuzo twig was not consumed");
+				require(pillar != null && twig.useOn(pillar),"Tuzo twig placement failed");
+				awaitTicks(() -> !Inventory.contains(item),20,"Tuzo twig was not consumed");
 			}
-			await(() -> stage() >= 130,30,"Tuzo puzzle completion was not observed");			return null;
+			awaitTicks(() -> stage() >= 130,30,"Tuzo puzzle completion was not observed");
+			return null;
 		});
-
 	}
 	private boolean combatReady() { return carried(1387) && Inventory.count(558) >= 300 && Inventory.count(556) >= 600 && Inventory.count(379) >= 6; }
-	@Override void escape() { Jewellery.teleport(Jewellery.Destination.CASTLE_WARS); }
+	@Override void escape() { leave(Jewellery.Destination.CASTLE_WARS,GnomeTravel.KING_TILE); }
 }

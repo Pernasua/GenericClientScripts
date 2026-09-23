@@ -9,12 +9,14 @@ import org.dreambot.api.wrappers.items.Item;
 
 public final class Jewellery
 {
+	public static final Supply DUELING_RING = new Supply(2552,"Ring of dueling(8)",1,10000,2554,2556,2558,2560,2562,2564,2566);
+	public static final Supply GAMES_NECKLACE = new Supply(3853,"Games necklace",1,1000,3855,3857,3859,3861,3863,3865,3867);
 	public enum Destination
 	{
-		BURTHORPE("Burthorpe",new Area(2860,3500,2920,3580),3853,3855,3857,3859,3861,3863,3865,3867),
-		BARBARIAN_OUTPOST("Barbarian Outpost",new Area(2500,3550,2540,3600),3853,3855,3857,3859,3861,3863,3865,3867),
-		CASTLE_WARS("Castle Wars Arena",new Area(2425,3075,2455,3105),2552,2554,2556,2558,2560,2562,2564,2566),
-		EMIRS_ARENA("Emir's Arena",new Area(3290,3210,3340,3260),2552,2554,2556,2558,2560,2562,2564,2566),
+		BURTHORPE("Burthorpe",new Area(2860,3500,2920,3580),GAMES_NECKLACE.ids),
+		BARBARIAN_OUTPOST("Barbarian Outpost",new Area(2500,3550,2540,3600),GAMES_NECKLACE.ids),
+		CASTLE_WARS("Castle Wars Arena",new Area(2425,3075,2455,3105),DUELING_RING.ids),
+		EMIRS_ARENA("Emir's Arena",new Area(3290,3210,3340,3260),DUELING_RING.ids),
 		GRAND_EXCHANGE("Grand Exchange",new Area(3150,3465,3180,3505),11980,11982,11984,11986,11988);
 		final String option;
 		final Area arrival;

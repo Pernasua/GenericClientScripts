@@ -4,6 +4,7 @@ import com.genericclient.script.Automation;
 import com.genericclient.script.ScriptSettings;
 import com.genericclient.script.SnapshotData;
 import com.genericclient.scripts.shared.Progress;
+import com.genericclient.scripts.shared.Safety;
 import com.genericclient.scripts.shared.Travel;
 import com.genericclient.scripts.shared.WorkflowScript;
 import java.util.Map;
@@ -32,8 +33,7 @@ public final class MeleeTrainer extends WorkflowScript
 		int targetXp = Skills.getExperienceForLevel(target);
 		int initialXp = Skills.getExperience(skill);
 		if (initialXp >= targetXp) return result("already_complete", skill, initialXp);
-		require(SnapshotData.action("client.behaviors.configure", Map.of("auto_retaliate", false, "emergency_escape", true)),
-			"Combat behavior configuration failed");
+		Safety.behaviors(false, true, true);
 		int style = skill == Skill.ATTACK ? 0 : skill == Skill.STRENGTH ? 1 : 3;
 		require(SnapshotData.action("combat.set_style", Map.of("style", style)), "Combat style was not set");
 		Travel.to(new Tile(3245,3245), 8);

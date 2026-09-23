@@ -43,7 +43,7 @@ public final class Travel
 			to(GRAND_EXCHANGE,8);
 			java.util.List<Integer> worn = org.dreambot.api.methods.container.impl.equipment.Equipment.all().stream()
 				.map(org.dreambot.api.wrappers.items.Item::getId).collect(java.util.stream.Collectors.toList());
-			Supply ring = new Supply(2552,"Ring of dueling",1,1000,2554,2556,2558,2560,2562,2564,2566);
+			Supply ring = Jewellery.DUELING_RING;
 			Supplies.ensure(java.util.List.of(ring,new Supply(1993,"Jug of wine",6,20)),true);
 			java.util.Map<Integer,Integer> items = new java.util.LinkedHashMap<>();
 			for (int id : worn) items.put(id,1);

@@ -28,10 +28,9 @@ Or from PowerShell:
 .\install.ps1
 ```
 
-The installer places the JAR in `~/.runelite/genericclient/scripts/` and removes
-retired interpreter sources and their manifest. Other Java script JARs remain.
-Reload the catalog in GenericClient, call the MCP `script_reload` tool, or restart
-the client. No backup of the retired catalog is created.
+The installer copies the JAR to `~/.runelite/genericclient/scripts/`, verifies the
+copy, and leaves other script JARs in place. Reload the catalog in GenericClient,
+call the MCP `script_reload` tool, or restart the client.
 
 ## Included scripts
 
@@ -82,7 +81,11 @@ Journey interruptions use `Navigation.walk(journey, interruptOn, continuation)`.
 
 Tests simulate observable inventory, dialogue, entity, and quest transitions.
 The offline route audit uses the client's bundled collision graph, ordered via
-points, arrival alternatives, and avoided tiles. These checks do not establish
-live completion of every quest, encounter, or journey.
-The catalog audit loads the packaged JAR through the client's production registry
-and verifies every entry point, input, action, and random-event binding.
+points, arrival alternatives, and avoided tiles. The catalog audit loads the
+packaged JAR through the client's production registry and verifies every entry
+point, input, action, and random-event binding.
+
+These checks do not establish live completion of a quest, encounter, or journey.
+A live account completed Romeo & Juliet and Goblin Diplomacy on 2026-09-05 (see
+[free quests](docs/free-quests.md)); every other workflow needs its own live
+acceptance.

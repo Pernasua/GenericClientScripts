@@ -34,7 +34,7 @@ public final class CountCheck extends WorkflowScript
 				if (!talked && EventSupport.present()) { EventSupport.talk(); talked = true; }
 				Sleep.sleepTicks(1);
 			}
-			throw new IllegalStateException("Count Check's outcome was not observed");		});
-
+			throw new IllegalStateException("Count Check's outcome was not observed");
+		});
 	}
 }

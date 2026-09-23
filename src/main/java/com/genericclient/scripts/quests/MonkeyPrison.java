@@ -21,12 +21,12 @@ final class MonkeyPrison
 	void enter()
 	{
 		if (MonkeyAreas.prison()) return;
-		QuestWorkflow.require(MonkeyAreas.south(),"Prison capture route must start on southern Ape Atoll");
+		WorkflowScript.require(MonkeyAreas.south(),"Prison capture route must start on southern Ape Atoll");
 		Automation.activity("hazardous_travel",WorkflowScript.NO_DISCRETIONARY);
 		MonkeySurvival.behavior(false); MonkeySurvival.protection("missiles",true,12);
 		Map<String,Object> moved = MonkeySurvival.traverse(() -> MonkeyRoutes.APE_ATOLL_VALLEY,"missiles",false);
-		QuestWorkflow.require("arrived".equals(moved.get("status")) || MonkeyAreas.prison(),"Ape Atoll capture route failed: " + moved);
-		QuestWorkflow.await(MonkeyAreas::prison,50,"Ape Atoll capture was not observed");
+		WorkflowScript.require("arrived".equals(moved.get("status")) || MonkeyAreas.prison(),"Ape Atoll capture route failed: " + moved);
+		WorkflowScript.awaitTicks(MonkeyAreas::prison,50,"Ape Atoll capture was not observed");
 		Conversations.finish(); MonkeySurvival.protection("missiles",false,0); MonkeySurvival.maintain();
 	}
 	void escape(boolean stopAtSafeSpot)
@@ -38,7 +38,7 @@ final class MonkeyPrison
 		settle(QuestWorkflow.tile());
 		if (QuestWorkflow.tile().getX() >= 2770 && QuestWorkflow.tile().getY() <= 2795 && door() != null)
 		{
-			QuestWorkflow.require(Inventory.contains(1523),"Prison lockpick is missing");
+			WorkflowScript.require(Inventory.contains(1523),"Prison lockpick is missing");
 			Travel.to(MonkeyMap.PRISON_START,0,"questing",WorkflowScript.NO_DISCRETIONARY);
 			boolean unlocked = false;
 			for (int cycle = 0; cycle < 10 && !unlocked; cycle++)
@@ -47,8 +47,8 @@ final class MonkeyPrison
 				int guard = lockWindow();
 				unlocked = pick(guard);
 			}
-			QuestWorkflow.require(unlocked,"Prison lock window was exhausted");
-			QuestWorkflow.await(() -> crossedDoor() || QuestWorkflow.tile().equals(MonkeyMap.PRISON_SAFE_SPOT),12,"Prison threshold crossing was not observed");
+			WorkflowScript.require(unlocked,"Prison lock window was exhausted");
+			WorkflowScript.awaitTicks(() -> crossedDoor() || QuestWorkflow.tile().equals(MonkeyMap.PRISON_SAFE_SPOT),12,"Prison threshold crossing was not observed");
 		}
 		Travel.to(MonkeyMap.PRISON_SAFE_SPOT,0,"questing",WorkflowScript.NO_DISCRETIONARY);
 		settle(MonkeyMap.PRISON_SAFE_SPOT);
@@ -62,18 +62,18 @@ final class MonkeyPrison
 			for (int tick = 0; tick < 20; tick++)
 			{
 				NPC actor = QuestWorkflow.npc(guard);
-				QuestWorkflow.require(actor != null,"Prison guard disappeared during exit timing");
+				WorkflowScript.require(actor != null,"Prison guard disappeared during exit timing");
 				if (actor.getTile().equals(MonkeyMap.PRISON_GUARD_FOLLOW))
 				{
 					MonkeySurvival.protection("missiles",true,12);
-					QuestWorkflow.require(SnapshotData.action("walk.click",Map.of("x",2762,"y",2804,"plane",0)),"Prison exit click failed");
-					QuestWorkflow.await(() -> QuestWorkflow.tile().equals(MonkeyMap.PRISON_CLEAR),60,"Prison exit arrival was not observed");
+					WorkflowScript.require(SnapshotData.action("walk.click",Map.of("x",2762,"y",2804,"plane",0)),"Prison exit click failed");
+					WorkflowScript.awaitTicks(() -> QuestWorkflow.tile().equals(MonkeyMap.PRISON_CLEAR),60,"Prison exit arrival was not observed");
 					return;
 				}
 				if (actor.getTile().equals(MonkeyMap.PRISON_GUARD_RETURN)) { retreat = true; break; }
 				Sleep.sleepTicks(1);
 			}
-			QuestWorkflow.require(retreat,"Prison exit decision was not observed");
+			WorkflowScript.require(retreat,"Prison exit decision was not observed");
 		}
 		throw new IllegalStateException("Prison exit opportunities were exhausted");
 	}
@@ -101,18 +101,18 @@ final class MonkeyPrison
 		for (int attempt = 0; attempt < 12; attempt++)
 		{
 			NPC guard = QuestWorkflow.npc(guardId);
-			QuestWorkflow.require(guard != null,"Prison guard disappeared");
+			WorkflowScript.require(guard != null,"Prison guard disappeared");
 			north |= guard.getTile().getY() > 2800;
 			if (north && guard.getTile().equals(MonkeyMap.PRISON_GUARD_RETURN)) return false;
 			GameObject door = door(); if (door == null) return true;
 			long tick = ScriptScope.current().tick();
-			QuestWorkflow.require(door.interact("Pick-lock"),"Prison lockpick interaction failed");
+			WorkflowScript.require(door.interact("Pick-lock"),"Prison lockpick interaction failed");
 			for (int wait = 0; wait < 12; wait++)
 			{
 				if (crossedDoor() || QuestWorkflow.message(tick,"manage to pick the lock")) return true;
 				if (QuestWorkflow.message(tick,"fail to pick the lock")) break;
 				guard = QuestWorkflow.npc(guardId);
-				QuestWorkflow.require(guard != null,"Prison guard disappeared while lockpicking");
+				WorkflowScript.require(guard != null,"Prison guard disappeared while lockpicking");
 				north |= guard.getTile().getY() > 2800;
 				if (north && guard.getTile().equals(MonkeyMap.PRISON_GUARD_RETURN)) return false;
 				Sleep.sleepTicks(1);
@@ -141,7 +141,7 @@ final class MonkeyPrison
 			quiet = !attacked && !WorkflowScript.player().isInCombat() ? quiet+1 : 0;
 			Sleep.sleepTicks(1);
 		}
-		QuestWorkflow.require(quiet >= 3,"Prison combat did not settle");
+		WorkflowScript.require(quiet >= 3,"Prison combat did not settle");
 		Travel.to(anchor,0,"questing",WorkflowScript.NO_DISCRETIONARY);
 	}
 	private GameObject door() { return GameObjects.closest(object -> object.getId() == 4799 && object.hasAction("Pick-lock")); }

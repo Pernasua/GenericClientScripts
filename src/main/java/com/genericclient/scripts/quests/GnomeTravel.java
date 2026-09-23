@@ -2,6 +2,7 @@ package com.genericclient.scripts.quests;
 
 import com.genericclient.scripts.shared.Jewellery;
 import com.genericclient.scripts.shared.Travel;
+import com.genericclient.scripts.shared.WorkflowScript;
 import org.dreambot.api.methods.interactive.GameObjects;
 import org.dreambot.api.methods.map.Tile;
 import org.dreambot.api.wrappers.interactive.GameObject;
@@ -31,7 +32,7 @@ final class GnomeTravel
 			quest.talk(new int[]{1431},null,() -> QuestWorkflow.tile().getY() >= 3384,false);
 		}
 		Travel.to(KING_TILE,2);
-		QuestWorkflow.require(QuestWorkflow.npc(KING) != null,"King Narnode was not observed after travel");
+		WorkflowScript.require(QuestWorkflow.npc(KING) != null,"King Narnode was not observed after travel");
 	}
 
 	void top() { Travel.to(TOP,1); }
@@ -44,8 +45,8 @@ final class GnomeTravel
 		glough();
 		Travel.to(new Tile(2482,3463,1),0);
 		GameObject tree = GameObjects.closest(candidate -> candidate.getId() == 2447 && candidate.hasAction("Climb-up"));
-		QuestWorkflow.require(tree != null && tree.interact("Climb-up"),"Glough's watchtower tree could not be climbed");
-		QuestWorkflow.await(() -> QuestWorkflow.tile().getZ() == 2,40,"Watchtower arrival was not observed");
+		WorkflowScript.require(tree != null && tree.interact("Climb-up"),"Glough's watchtower tree could not be climbed");
+		WorkflowScript.awaitTicks(() -> QuestWorkflow.tile().getZ() == 2,40,"Watchtower arrival was not observed");
 	}
 
 	void hazelmere()

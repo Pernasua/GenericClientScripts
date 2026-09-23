@@ -1,5 +1,8 @@
 package com.genericclient.scripts.quests;
 
+import static com.genericclient.scripts.shared.WorkflowScript.awaitTicks;
+import static com.genericclient.scripts.shared.WorkflowScript.require;
+
 import org.dreambot.api.methods.settings.PlayerSettings;
 import com.genericclient.script.Automation;
 import com.genericclient.scripts.shared.Jewellery;
@@ -15,6 +18,9 @@ import org.dreambot.api.methods.map.Tile;
 import org.dreambot.api.methods.skills.Skill;
 import org.dreambot.api.methods.skills.Skills;
 import org.dreambot.api.methods.widget.Widgets;
+import org.dreambot.api.wrappers.interactive.GameObject;
+import org.dreambot.api.wrappers.interactive.NPC;
+import org.dreambot.api.wrappers.items.Item;
 
 final class WitchsHouse extends QuestWorkflow
 {
@@ -24,6 +30,7 @@ final class WitchsHouse extends QuestWorkflow
 	static final Area BASEMENT_EAST = new Area(2903,9870,2909,9878);
 	static final Area BASEMENT_WEST = new Area(2897,9870,2902,9878);
 	static final Area SHED = new Area(2934,3459,2937,3467);
+	static final Tile OUTSIDE_GARDEN = new Tile(2928,3456);
 	private boolean introPrepared;
 	private boolean combatPrepared;
 	WitchsHouse() { super("witchs_house"); }
@@ -70,7 +77,7 @@ final class WitchsHouse extends QuestWorkflow
 		switch (phase)
 		{
 			case "prepare": prepareIntro(); break;
-			case "accept": talk(new int[]{3994},new Tile(2928,3456),() -> stage() > 0,false,"What's the matter?","Ok, I'll see what I can do.","Yes."); break;
+			case "accept": talk(new int[]{3994},OUTSIDE_GARDEN,() -> stage() > 0,false,"What's the matter?","Ok, I'll see what I can do.","Yes."); break;
 			case "house_key": interact(2867,"Look-under",new Tile(2900,3474),() -> Inventory.contains(2409),false); break;
 			case "enter_house": openAndCross(2861,new Tile(2900,3473),new Tile(2902,3473)); break;
 			case "basement": walk(BASEMENT_ENTRY,0,false); break;
@@ -85,7 +92,7 @@ final class WitchsHouse extends QuestWorkflow
 				Automation.intent("witchs_house.read_diary", () ->
 				{
 					require(Inventory.interact(2408,"Read"),"Witch's diary could not be read");
-					await(() -> stage() >= 5,20,"Witch's diary stage did not update");
+					awaitTicks(() -> stage() >= 5,20,"Witch's diary stage did not update");
 					require(Widgets.closeAll(),"Witch's diary did not close");
 					return null;
 				}); break;
@@ -98,7 +105,7 @@ final class WitchsHouse extends QuestWorkflow
 	}
 	private void prepareIntro()
 	{
-		List<Supply> supplies = new ArrayList<>(List.of(new Supply(1985,"Cheese",2,100),new Supply(1059,"Leather gloves",1,50),necklace()));
+		List<Supply> supplies = new ArrayList<>(List.of(new Supply(1985,"Cheese",2,100),new Supply(1059,"Leather gloves",1,50),Jewellery.GAMES_NECKLACE));
 		for (int id : new int[]{2409,2410,2408,2411}) if (carried(id) || Supplies.owned(id) > 0) supplies.add(questItem(id,"Quest item"));
 		prepare(supplies);
 		introPrepared = true;
@@ -107,7 +114,7 @@ final class WitchsHouse extends QuestWorkflow
 	{
 		List<Supply> supplies = new ArrayList<>(List.of(new Supply(1387,"Staff of fire",1,1200),
 			new Supply(556,"Air rune",300,10),new Supply(558,"Mind rune",150,10),new Supply(2550,"Ring of recoil",4,1000),
-			necklace(),wine(6),questItem(2409,"Door key")));
+			Jewellery.GAMES_NECKLACE,wine(6),questItem(2409,"Door key")));
 		if (carried(2411) || Supplies.owned(2411) > 0) supplies.add(questItem(2411,"Shed key"));
 		prepare(supplies);
 		Jewellery.teleport(Jewellery.Destination.BURTHORPE);
@@ -124,10 +131,14 @@ final class WitchsHouse extends QuestWorkflow
 		walk(new Tile(2903,3467),3,false);
 		Automation.intent("witchs_house.lure_mouse", () ->
 		{
-			require(Inventory.get(1985).useOn(object(2870,new Tile(2903,3466))),"Cheese could not be placed at the mouse hole");
-			await(() -> npc(4000) != null,50,"Mouse did not appear");
-			require(Inventory.get(2410).useOn(npc(4000)),"Magnet could not be attached to the mouse");
-			await(() -> stage() >= 3,20,"Mouse stage did not update");
+			Item cheese = Inventory.get(1985);
+			GameObject hole = object(2870,new Tile(2903,3466));
+			require(cheese != null && hole != null && cheese.useOn(hole),"Cheese could not be placed at the mouse hole");
+			awaitTicks(() -> npc(4000) != null,50,"Mouse did not appear");
+			Item magnet = Inventory.get(2410);
+			NPC mouse = npc(4000);
+			require(magnet != null && mouse != null && magnet.useOn(mouse),"Magnet could not be attached to the mouse");
+			awaitTicks(() -> stage() >= 3,20,"Mouse stage did not update");
 			return null;
 		});
 	}
@@ -137,7 +148,7 @@ final class WitchsHouse extends QuestWorkflow
 		if (tile().getX() >= 2900 && tile().getX() <= 2937 && tile().getY() >= 3459 && tile().getY() <= 3475)
 			Jewellery.teleport(Jewellery.Destination.BURTHORPE);
 		require(Inventory.contains(2407),"Ball was lost before returning to the boy");
-		talk(new int[]{3994},new Tile(2927,3455),this::finished,false);
+		talk(new int[]{3994},OUTSIDE_GARDEN,this::finished,false);
 	}
-	@Override void escape() { Jewellery.teleport(Jewellery.Destination.BURTHORPE); }
+	@Override void escape() { leave(Jewellery.Destination.BURTHORPE,OUTSIDE_GARDEN); }
 }

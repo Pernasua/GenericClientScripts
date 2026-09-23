@@ -8,6 +8,7 @@ import java.util.List;
 import com.genericclient.script.SnapshotData;
 import com.genericclient.scripts.shared.Conversations;
 import com.genericclient.scripts.shared.Jewellery;
+import com.genericclient.scripts.shared.Safety;
 import com.genericclient.scripts.shared.Supplies;
 import java.util.Map;
 import org.dreambot.api.methods.container.impl.Inventory;
@@ -34,7 +35,7 @@ final class MonkeyFavor
 		if (!MonkeyAreas.pen())
 		{
 			NPC minder = QuestWorkflow.npc(5235);
-			QuestWorkflow.require(minder != null && minder.interact("Talk-to"),"Zoo minder dialogue failed");
+			WorkflowScript.require(minder != null && minder.interact("Talk-to"),"Zoo minder dialogue failed");
 			for (int tick = 0; tick < 160 && !MonkeyAreas.pen(); tick++)
 			{
 				Map<?,?> page = SnapshotData.read("dialogue");
@@ -46,14 +47,14 @@ final class MonkeyFavor
 				}
 				Sleep.sleepTicks(1);
 			}
-			QuestWorkflow.require(MonkeyAreas.pen(),"Monkey pen entry was not observed");
+			WorkflowScript.require(MonkeyAreas.pen(),"Monkey pen entry was not observed");
 		}
 		quest.talk(new int[]{5279,5280},null,() -> Inventory.contains(4033),false);
 		preserveMonkey(); leavePen();
 	}
 	void carry()
 	{
-		QuestWorkflow.require(Inventory.contains(4033),"Zoo monkey is not carried");
+		WorkflowScript.require(Inventory.contains(4033),"Zoo monkey is not carried");
 		preserveMonkey(); leavePen();
 		if (!MonkeyAreas.ape())
 		{
@@ -68,7 +69,7 @@ final class MonkeyFavor
 	}
 	void favor()
 	{
-		QuestWorkflow.require(Inventory.contains(4033),"Zoo monkey is not carried");
+		WorkflowScript.require(Inventory.contains(4033),"Zoo monkey is not carried");
 		preserveMonkey(); disguise(); enterMarim();
 		if (!MonkeyAreas.throne())
 		{
@@ -81,8 +82,8 @@ final class MonkeyFavor
 			{
 				returnFromBridge(); walk(MonkeyMap.ELDER_GUARD,3);
 				NPC guard = QuestWorkflow.npc(5278);
-				QuestWorkflow.require(guard != null && guard.interact("Talk-to"),"Elder guard dialogue failed");
-				QuestWorkflow.await(Dialogues::inDialogue,20,"Elder guard did not respond");
+				WorkflowScript.require(guard != null && guard.interact("Talk-to"),"Elder guard dialogue failed");
+				WorkflowScript.awaitTicks(Dialogues::inDialogue,20,"Elder guard did not respond");
 				Conversations.finish(); Automation.checkpoint(GUARD,1);
 			}
 			if (!MonkeyAreas.APE_ATOLL_BRIDGE.contains(QuestWorkflow.tile()) && !MonkeyAreas.APE_ATOLL_OVER_BRIDGE.contains(QuestWorkflow.tile())) transport(MonkeyRoutes.GARKOR_TO_WEST_LADDER);
@@ -90,7 +91,7 @@ final class MonkeyFavor
 			quest.talk(new int[]{5257},null,MonkeyAreas::throne,false);
 		}
 		GameObject throne = GameObjects.closest(object -> object.getId() == 4771 && object.hasAction("Talk-to"));
-		QuestWorkflow.require(throne != null && throne.interact("Talk-to"),"Awowogei's throne was not available");
+		WorkflowScript.require(throne != null && throne.interact("Talk-to"),"Awowogei's throne was not available");
 		quest.dialogue(() -> !Inventory.contains(4033),180);
 		Automation.clearCheckpoint(GUARD); MonkeySurvival.behavior(true);
 	}
@@ -111,7 +112,7 @@ final class MonkeyFavor
 		GameObject gate = GameObjects.closest(4788);
 		if (gate != null)
 		{
-			QuestWorkflow.require(gate.interact("Open"),"Marim gate did not open");
+			WorkflowScript.require(gate.interact("Open"),"Marim gate did not open");
 			quest.dialogue(() -> GameObjects.closest(object -> object.getId() == 4789 || object.getId() == 4790) != null || MonkeyAreas.north(),60);
 		}
 		walk(MonkeyMap.MARIM_GATE_NORTH,0);
@@ -139,21 +140,21 @@ final class MonkeyFavor
 	private void ladder(int id, String action, int plane)
 	{
 		clearChatter(); GameObject ladder = GameObjects.closest(id);
-		QuestWorkflow.require(ladder != null && ladder.interact(action),"Monkey bridge ladder failed");
-		QuestWorkflow.await(() -> QuestWorkflow.tile().getZ() == plane,30,"Monkey bridge plane change was not observed");
+		WorkflowScript.require(ladder != null && ladder.interact(action),"Monkey bridge ladder failed");
+		WorkflowScript.awaitTicks(() -> QuestWorkflow.tile().getZ() == plane,30,"Monkey bridge plane change was not observed");
 	}
 	private void leavePen()
 	{
 		if (!MonkeyAreas.pen()) return;
 		org.dreambot.api.wrappers.items.Item greegree = Equipment.get(item -> item.getId() == 4031);
-		if (greegree != null) QuestWorkflow.require(greegree.interact("Remove"),"Greegree could not be removed");
+		if (greegree != null) WorkflowScript.require(greegree.interact("Remove"),"Greegree could not be removed");
 		quest.talk(new int[]{5235},null,() -> !MonkeyAreas.pen(),false);
 	}
 	private void disguise() { Supplies.equip(4021); Supplies.equip(4031); }
 	private void preserveMonkey()
 	{
 		Automation.activity("questing",WorkflowScript.NO_DISCRETIONARY);
-		QuestWorkflow.require(SnapshotData.action("client.behaviors.configure",Map.of("auto_retaliate",true,"emergency_escape",false,"combat_prayer",false)),"Monkey transport policy could not be applied");
+		Safety.behaviors(true,false,false);
 	}
 	private void walk(Tile point, int within) { transport(new Journey(point,within).timeout(300)); }
 	static void transport(Journey journey)
@@ -164,14 +165,14 @@ final class MonkeyFavor
 		for (int attempt = 0; attempt < 24; attempt++)
 		{
 			clearChatter();
-			QuestWorkflow.require(!Dialogues.inDialogue(),"Monkey transport interrupted by " + SnapshotData.read("dialogue").get("speaker"));
+			WorkflowScript.require(!Dialogues.inDialogue(),"Monkey transport interrupted by " + SnapshotData.read("dialogue").get("speaker"));
 			Map<String,Object> interrupts = carrying ? Map.of("dialogue",true,"missing_item",List.of("Monkey")) : Map.of("dialogue",true);
 			Map<String,Object> moved = Navigation.walk(journey,interrupts,continuation);
 			if ("arrived".equals(moved.get("status"))) return;
 			String reason = String.valueOf(moved.get("reason"));
 			boolean recoverable = "unavailable".equals(moved.get("status")) ||
 				"interrupted".equals(moved.get("status")) && reason.equals("dialogue");
-			QuestWorkflow.require(recoverable && moved.get("continuation") != null,"Monkey transport journey failed: " + moved);
+			WorkflowScript.require(recoverable && moved.get("continuation") != null,"Monkey transport journey failed: " + moved);
 			continuation = (String)moved.get("continuation");
 			clearChatter(); Sleep.sleepTicks(1);
 		}
@@ -185,11 +186,11 @@ final class MonkeyFavor
 		{
 			if ("closed".equals(dialogue.get("type"))) return;
 			String speaker = (String)dialogue.get("speaker");
-			QuestWorkflow.require("continue".equals(dialogue.get("type")) &&
+			WorkflowScript.require("continue".equals(dialogue.get("type")) &&
 				("The monkey in your backpack...".equals(speaker) ||
-					com.genericclient.scripts.shared.WorkflowScript.player().getName().equals(speaker)),
+					WorkflowScript.player().getName().equals(speaker)),
 				"Monkey chatter changed to " + speaker);
-			QuestWorkflow.require(SnapshotData.action("dialogue.continue",Map.of("reading",false)),"Monkey chatter did not continue");
+			WorkflowScript.require(SnapshotData.action("dialogue.continue",Map.of("reading",false)),"Monkey chatter did not continue");
 			Sleep.sleepTicks(1);
 			dialogue = SnapshotData.read("dialogue");
 		}

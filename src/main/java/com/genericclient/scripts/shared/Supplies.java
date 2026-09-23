@@ -92,12 +92,13 @@ public final class Supplies
 				"item_id", supply.id, "item_name", supply.name, "quantity", supply.quantity,
 				"maximum_unit_price", supply.maximumPrice, "minimum_cash_reserve", CASH_RESERVE,
 				"collect_mode", "bank");
-			while (true)
+			for (int check = 1; ; check++)
 			{
 				Map<String,Object> receipt = ScriptScope.current().execute("ge.buy",request,240_000);
 				if ("complete".equals(receipt.get("status"))) break;
 				WorkflowScript.require("placed".equals(receipt.get("status")) && "ge_offer_pending".equals(receipt.get("result")),
 					"Purchase failed: " + supply.name + " (" + receipt.get("status") + ": " + receipt.get("result") + ")");
+				WorkflowScript.require(check < 3,"Purchase offer was still open after three checks: " + supply.name);
 			}
 		}
 		WorkflowScript.require(SnapshotData.action("ui.close", Map.of()), "Exchange did not close");

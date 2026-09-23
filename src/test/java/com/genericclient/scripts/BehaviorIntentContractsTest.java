@@ -2,6 +2,7 @@ package com.genericclient.scripts;
 
 import static org.junit.Assert.*;
 
+import com.genericclient.scripts.shared.WorkflowScript;
 import java.util.List;
 import java.util.Map;
 import org.dreambot.api.methods.map.Tile;
@@ -34,12 +35,11 @@ public class BehaviorIntentContractsTest
 		};
 		game.run();
 		assertEquals(4,game.stage);
-		assertEquals(List.of(Map.of("policy",Map.of("breaks",false,"cursor_release","none","fidget","none"))),game.phaseOptions);
+		assertEquals(List.of(Map.of("policy",WorkflowScript.NO_DISCRETIONARY)),game.phaseOptions);
 		assertEquals(List.of("tree_gnome_village.talk"),game.intents.entries);
-		assertNull(game.intents.current);
 	}
 
-	@Test public void mouseItemsShareAnIntentThatUnwindsOnFailure()
+	@Test public void mouseItemsShareOneIntent()
 	{
 		QuestScenario game = new QuestScenario("witchs_house",226,2,new Tile(2898,3467));
 		game.inventory.putAll(Map.of(1059,1,1985,1,2410,1));
@@ -65,6 +65,5 @@ public class BehaviorIntentContractsTest
 		try { game.run(); fail("Rejected magnet was accepted"); }
 		catch (IllegalStateException failure) { assertEquals("Magnet rejected",failure.getMessage()); }
 		assertEquals(List.of("witchs_house.lure_mouse"),game.intents.entries);
-		assertNull(game.intents.current);
 	}
 }

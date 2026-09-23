@@ -1,6 +1,7 @@
 package com.genericclient.scripts;
 
 import static org.junit.Assert.*;
+import com.genericclient.scripts.shared.WorkflowScript;
 import java.util.List;
 import java.util.Map;
 import org.dreambot.api.methods.map.Tile;
@@ -82,7 +83,7 @@ public class MonkeyHazardsTest
             if (type.equals("walk.to"))
             {
                 assertEquals("hazardous_travel",game.activity);
-                assertEquals(Map.of("breaks",false,"cursor_release","none","fidget","none"),game.policy);
+                assertEquals(WorkflowScript.NO_DISCRETIONARY,game.policy);
                 Tile target=tile((Map<?,?>)args.get("destination"));
                 if (target.getY()<9000)
                 {

@@ -1,5 +1,8 @@
 package com.genericclient.scripts.quests;
 
+import static com.genericclient.scripts.shared.WorkflowScript.awaitTicks;
+import static com.genericclient.scripts.shared.WorkflowScript.require;
+
 import com.genericclient.script.Automation;
 import com.genericclient.script.SnapshotData;
 import com.genericclient.scripts.shared.Supplies;
@@ -74,7 +77,7 @@ final class GoblinDiplomacy extends QuestWorkflow
 			Item heldDye = Inventory.get(dye);
 			Item mail = Inventory.get(288);
 			require(heldDye != null && mail != null && heldDye.useOn(mail),"Goblin mail dyeing failed");
-			await(() -> Inventory.contains(colouredMail),20,"Dyed goblin mail was not observed");
+			awaitTicks(() -> Inventory.contains(colouredMail),20,"Dyed goblin mail was not observed");
 			return null;
 		});
 	}

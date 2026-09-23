@@ -23,7 +23,7 @@ abstract class GiftEvent extends WorkflowScript
 				else if (!talked && EventSupport.present()) { EventSupport.talk(); talked = true; }
 				Sleep.sleepTicks(1);
 			}
-			throw new IllegalStateException("Random-event reward was not observed");		});
-
+			throw new IllegalStateException("Random-event reward was not observed");
+		});
 	}
 }

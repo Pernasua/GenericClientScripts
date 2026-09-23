@@ -1,5 +1,8 @@
 package com.genericclient.scripts.quests;
 
+import static com.genericclient.scripts.shared.WorkflowScript.awaitTicks;
+import static com.genericclient.scripts.shared.WorkflowScript.require;
+
 import org.dreambot.api.methods.settings.PlayerSettings;
 import com.genericclient.scripts.shared.WorkflowScript;
 import com.genericclient.script.Automation;
@@ -158,7 +161,7 @@ final class MonkeyMadness extends QuestWorkflow
 			case "finish_amulet": amulet.leaveTemple(); break;
 			case "talisman": new MonkeyTalisman(prison).obtain(); break;
 			case "greegree": greegree(); break;
-			case "sync_greegree": await(() -> stage() >= 4,30,"Greegree quest progress did not synchronize"); break;
+			case "sync_greegree": awaitTicks(() -> stage() >= 4,30,"Greegree quest progress did not synchronize"); break;
 			case "zoo": favor.zoo(); break;
 			case "carry_monkey": favor.carry(); break;
 			case "favor": favor.favor(); break;
@@ -228,6 +231,7 @@ final class MonkeyMadness extends QuestWorkflow
 	}
 	@Override void escape()
 	{
-		if (!Inventory.contains(4033)) Jewellery.teleport(Jewellery.Destination.CASTLE_WARS);
+		// The carried zoo monkey suppresses escape teleports, and no walking route leaves the islands, so both cases stop in place.
+		if (!Inventory.contains(4033) && Jewellery.carried(Jewellery.Destination.CASTLE_WARS)) Jewellery.teleport(Jewellery.Destination.CASTLE_WARS);
 	}
 }

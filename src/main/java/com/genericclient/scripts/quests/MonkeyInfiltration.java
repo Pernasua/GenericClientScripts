@@ -36,7 +36,7 @@ final class MonkeyInfiltration
 		if (Inventory.contains(4020)) return;
 		Travel.to(MonkeyMap.AMULET_MOULD_CRATE,1,"hazardous_travel");
 		GameObject crate = GameObjects.closest(4724);
-		QuestWorkflow.require(crate != null && crate.interact("Search"),"Amulet mould crate search failed");
+		WorkflowScript.require(crate != null && crate.interact("Search"),"Amulet mould crate search failed");
 		quest.dialogue(() -> Inventory.contains(4020),60,"Yes");
 	}
 	private void building()
@@ -48,8 +48,8 @@ final class MonkeyInfiltration
 		if (MonkeyAreas.prison()) prison.escape(false);
 		MonkeySurvival.route(fromPrison ? MonkeyRoutes.PRISON_TO_DENTURES : MonkeyRoutes.GARKOR_TO_DENTURES,"missiles");
 		GameObject door = GameObjects.closest(4710);
-		QuestWorkflow.require(door != null && door.interact("Open"),"Denture building did not open");
-		QuestWorkflow.await(() -> MonkeyAreas.DENTURE_BUILDING.contains(QuestWorkflow.tile()),30,"Denture building entry was not observed");
+		WorkflowScript.require(door != null && door.interact("Open"),"Denture building did not open");
+		WorkflowScript.awaitTicks(() -> MonkeyAreas.DENTURE_BUILDING.contains(QuestWorkflow.tile()),30,"Denture building entry was not observed");
 	}
 	private void carefulWalk(org.dreambot.api.methods.map.Tile point, int within)
 	{
@@ -57,15 +57,15 @@ final class MonkeyInfiltration
 		Map<String,Object> moved = Navigation.walk(new Navigation.Journey(point,within).timeout(40)
 			.avoiding(Arrays.asList(MonkeyMap.DENTURE_LIGHT_FLOOR)),
 			Map.of("area",Map.of("name","prison","bounds",MonkeyAreas.PRISON_BOUNDS)),null);
-		QuestWorkflow.require("arrived".equals(moved.get("status")) && !MonkeyAreas.prison(),"Denture aisle route failed: " + moved);
+		WorkflowScript.require("arrived".equals(moved.get("status")) && !MonkeyAreas.prison(),"Denture aisle route failed: " + moved);
 	}
 	private void searchCrate(int id, String failure)
 	{
 		GameObject crate = GameObjects.closest(id);
-		QuestWorkflow.require(crate != null,failure);
+		WorkflowScript.require(crate != null,failure);
 		EntityReference reference = (EntityReference)crate.getReference();
 		Map<?,?> observed = reference.read();
-		QuestWorkflow.require(!observed.isEmpty() && SnapshotData.action("object.interact",Map.of(
+		WorkflowScript.require(!observed.isEmpty() && SnapshotData.action("object.interact",Map.of(
 			"id",id,"identity",reference.identity,"action","Search","world",observed.get("world"),"within",2)),failure);
 	}
 }

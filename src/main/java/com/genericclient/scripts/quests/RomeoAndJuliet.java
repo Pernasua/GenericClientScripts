@@ -10,6 +10,8 @@ import org.dreambot.api.methods.map.Tile;
 
 final class RomeoAndJuliet extends QuestWorkflow
 {
+	// Talk-to cannot reach Juliet through her closed door, and an adjacent tile outside it already counts as near her.
+	private static final Tile JULIET_ROOM = new Tile(3158,3426,1);
 	RomeoAndJuliet() { super("romeo__juliet"); }
 	@Override int stage() { return PlayerSettings.getConfig(144); }
 
@@ -55,7 +57,8 @@ final class RomeoAndJuliet extends QuestWorkflow
 					"Yes, I have seen her actually!","Yes, ok, I'll let her know.","Yes.");
 				break;
 			case "letter":
-				talk(new int[]{5035},new Tile(3158,3427,1),() -> Inventory.contains(755),false);
+				walk(JULIET_ROOM,0,false);
+				talk(new int[]{5035},null,() -> Inventory.contains(755),false);
 				break;
 			case "deliver_letter":
 				talk(new int[]{5037},new Tile(3211,3422),() -> stage() >= 30,false);
@@ -70,7 +73,8 @@ final class RomeoAndJuliet extends QuestWorkflow
 					"Talk about something else.","Talk about Romeo & Juliet.");
 				break;
 			case "deliver_potion":
-				talk(new int[]{5035},new Tile(3158,3427,1),() -> stage() >= 60,false);
+				walk(JULIET_ROOM,0,false);
+				talk(new int[]{5035},null,() -> stage() >= 60,false);
 				break;
 			default:
 				talk(new int[]{5037},new Tile(3211,3422),this::finished,false);

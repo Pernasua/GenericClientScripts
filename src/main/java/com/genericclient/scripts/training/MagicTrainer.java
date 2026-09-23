@@ -115,10 +115,14 @@ public final class MagicTrainer extends WorkflowScript
 				require(failures < 5, "Combat casts did not produce Magic XP");
 			}
 		}
-		finally
+		catch (RuntimeException failure)
 		{
-			Travel.to(DISENGAGE, 0);
+			// The training failure stays the reported cause even when the walk out of the jail fails too.
+			try { Travel.to(DISENGAGE, 0); }
+			catch (RuntimeException disengage) { failure.addSuppressed(disengage); }
+			throw failure;
 		}
+		Travel.to(DISENGAGE, 0);
 	}
 
 	private int observeCombat(int goal, int before)

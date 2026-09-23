@@ -105,7 +105,6 @@ public class EventRejectionsTest
 		count.input = (type,args) -> assertEquals("npc.interact",type);
 		fails(count,"Count Check's outcome was not observed");
 		assertEquals(1,count.gameInputs);
-		assertNull(count.intents.current);
 	}
 
 	@Test public void anUnobservedInvitationDoesNotStartTheMimeShow()
@@ -114,7 +113,6 @@ public class EventRejectionsTest
 		game.input = (type,args) -> assertEquals("npc.interact",type);
 		fails(game,"Random-event activity did not open");
 		assertEquals(1,game.gameInputs);
-		assertNull(game.intents.current);
 	}
 
 	@Test public void mollyRejectsAMissingActorAndUnknownAppearance()
@@ -135,7 +133,6 @@ public class EventRejectionsTest
 			};
 			fails(game,missing ? "Molly was not available" : "Unknown Molly appearance");
 			assertEquals(missing ? 0 : 2,game.gameInputs);
-			assertNull(game.intents.current);
 		}
 	}
 
@@ -146,7 +143,6 @@ public class EventRejectionsTest
 			EventScenario game = certer(unknownModel ? 999999 : 8837);
 			fails(game,unknownModel ? "Unrecognized Certer model" : "answer label was not found");
 			assertEquals(0,game.gameInputs);
-			assertNull(game.intents.current);
 		}
 	}
 
@@ -164,7 +160,6 @@ public class EventRejectionsTest
 			};
 			fails(game,reject ? "Widget interaction failed" : "Certer reward was not observed");
 			assertEquals(1,game.gameInputs);
-			assertNull(game.intents.current);
 		}
 	}
 
@@ -211,7 +206,6 @@ public class EventRejectionsTest
 		};
 		fails(game,"Random-event NPC interaction failed");
 		assertEquals(1,game.gameInputs);
-		assertNull(game.intents.current);
 	}
 
 	@Test public void evilBobRequiresTwoFreeSlotsBeforeObtainingTheNet()

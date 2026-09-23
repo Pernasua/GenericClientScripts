@@ -32,8 +32,8 @@ public final class DeathRecovery extends WorkflowScript
 		Automation.activity("banking");
 		openRetrieval();
 		Map<Integer,Integer> before = quantities();
-		takeAll();
-		if (gained(before).isEmpty()) transferGravestone();
+		takeAll(before);
+		if (gained(before).isEmpty()) transferGravestone(before);
 		Map<Integer,Integer> recovered = gained(before);
 		require(Widgets.closeAll(),"Retrieval interface did not close");
 		Sleep.sleepTicks(1);
@@ -69,20 +69,21 @@ public final class DeathRecovery extends WorkflowScript
 		}
 		throw new IllegalStateException("Death's retrieval interface did not open");
 	}
-	private void takeAll()
+	private void takeAll(Map<Integer,Integer> before)
 	{
 		Interfaces.click(TAKE_ALL);
-		Sleep.sleepTicks(4);
+		// Take-All answers with the items or a confirmation; an empty retrieval answers with neither, so the timeout is not a failure.
+		Sleep.sleepUntil(() -> !gained(before).isEmpty() || Dialogues.inDialogue(),2400);
 		require(!Dialogues.inDialogue(),"Death recovery requires confirmation");
 	}
-	private void transferGravestone()
+	private void transferGravestone(Map<Integer,Integer> before)
 	{
 		require(Widgets.closeAll(),"Retrieval interface did not close");
 		NPC death = NPCs.closest(9855);
 		require(death != null && death.interact("Talk-to"),"Death's gravestone dialogue did not open");
 		await(Dialogues::inDialogue,6000,"Gravestone dialogue was not observed");
 		retrievalDialogue();
-		takeAll();
+		takeAll(before);
 	}
 	private Map<Integer,Integer> quantities()
 	{

@@ -10,6 +10,4 @@ fi
 mkdir -p -- "$scripts_directory"
 install -m 644 -- "$catalog_jar" "$scripts_directory/GenericClientScripts.jar"
 cmp -- "$catalog_jar" "$scripts_directory/GenericClientScripts.jar"
-find "$scripts_directory" -type f -name '*.lua' -delete
-rm -f -- "$scripts_directory/manifest.json"
 printf 'Installed %s/GenericClientScripts.jar. Reload the script catalog in GenericClient.\n' "$scripts_directory"

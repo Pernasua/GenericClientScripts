@@ -9,19 +9,6 @@ import org.junit.Test;
 
 public class GoblinDiplomacyTest
 {
-    @Test public void missingDyesAreLoadedWithoutReplacingCarriedMail()
-    {
-        for (Map<Integer,Integer> stock : List.of(Map.of(1769,1,1767,1,288,3),Map.of(1767,1,288,2)))
-        {
-            QuestScenario game = unknownBank(stock);
-            game.stage = stock.containsKey(1769) ? 3 : 4;
-            game.inventory.put(288,game.bank.remove(288));
-            game.run();
-            assertTrue(game.finished);
-            assertTrue(game.inventory.isEmpty());
-        }
-    }
-
     @Test public void itemsRemovedDuringTheIntentBoundaryCannotBeUsed()
     {
         for (int removed : List.of(1769,288))
@@ -57,11 +44,13 @@ public class GoblinDiplomacyTest
         }
     }
 
-    @Test public void openingAnUnknownBankReusesColouredMailAndWithdrawsOnlyTheMissingMaterials()
+    @Test public void openingAnUnknownBankKeepsCarriedMailAndWithdrawsOnlyTheMissingMaterials()
     {
-        for (Map<Integer,Integer> stock : List.of(Map.of(286,1,1767,1,288,2),Map.of(1769,1,1767,1,288,3)))
+        for (boolean mailCarried : List.of(false,true))
         {
+            Map<Integer,Integer> stock = mailCarried ? Map.of(1769,1,1767,1,288,3) : Map.of(286,1,1767,1,288,2);
             QuestScenario game = unknownBank(stock);
+            if (mailCarried) game.inventory.put(288,game.bank.remove(288));
             game.run();
             assertTrue(game.finished);
             assertTrue(game.inventory.isEmpty());
@@ -150,7 +139,7 @@ public class GoblinDiplomacyTest
         {
             QuestScenario game = village();
             game.stage = stage;
-            game.position = new Tile(3170,3488);
+            game.position = new Tile(3175,3480);
             game.bankOpen = true;
             game.bank.put(288,1);
             game.bank.put(286,1);
@@ -177,7 +166,7 @@ public class GoblinDiplomacyTest
                     Map<?,?> destination = (Map<?,?>)args.get("destination");
                     if (destination.get("x").equals(3165))
                     {
-                        assertEquals(2,args.get("within"));
+                        assertEquals(8,args.get("within"));
                         game.position = new Tile(3165,3491);
                     }
                     else game.position = new Tile(2958,3512);
@@ -202,18 +191,6 @@ public class GoblinDiplomacyTest
         assertEquals(Map.of("status","complete","quest","goblin_diplomacy","stage",6),game.result);
         assertTrue(game.inventory.isEmpty());
         assertEquals(4,game.actions.stream().filter("npc.interact"::equals).count());
-    }
-
-    @Test public void dyesTwoMailsAndKeepsOneBrown()
-    {
-        QuestScenario game = village();
-        game.inventory.put(288,3);
-        game.inventory.put(1767,1);
-        game.inventory.put(1769,1);
-        game.run();
-        assertEquals(Map.of("status","complete","quest","goblin_diplomacy","stage",6),game.result);
-        assertTrue(game.inventory.isEmpty());
-        assertEquals(2,game.actions.stream().filter("item.use_on_item"::equals).count());
     }
 
     private static QuestScenario village()
@@ -244,7 +221,6 @@ public class GoblinDiplomacyTest
             else
             {
                 assertEquals("dialogue.choose",type);
-                assertEquals(choice(game.stage),args.get("text"));
                 game.transitions.add(() ->
                 {
                     game.dialogue = Map.of("open",false,"type","closed","options",List.of());

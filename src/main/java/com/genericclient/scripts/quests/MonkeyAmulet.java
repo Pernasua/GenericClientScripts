@@ -5,6 +5,7 @@ import com.genericclient.script.Automation;
 import com.genericclient.script.Navigation;
 import com.genericclient.scripts.shared.Supplies;
 import com.genericclient.scripts.shared.Travel;
+import com.genericclient.scripts.shared.WorkflowScript;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -26,14 +27,14 @@ final class MonkeyAmulet
 			MonkeySurvival.protection("melee",true,12);
 			Travel.to(MonkeyMap.TEMPLE_FLAME_STAGING,0,"hazardous_travel");
 			GameObject flame = QuestWorkflow.object(4766,MonkeyMap.TEMPLE_FLAME_EDGE);
-			QuestWorkflow.require(flame != null && Inventory.get(4007).useOn(flame),"Enchanted bar could not be used on the flame");
+			WorkflowScript.require(flame != null && Inventory.get(4007).useOn(flame),"Enchanted bar could not be used on the flame");
 			quest.dialogue(() -> Inventory.contains(4022),40);
 		}
 		if (!QuestWorkflow.carried(4021))
 		{
-			QuestWorkflow.require(Inventory.contains(1759),"Ball of wool is missing");
-			QuestWorkflow.require(Inventory.get(1759).useOn(Inventory.get(4022)),"M'speak amulet could not be strung");
-			QuestWorkflow.await(() -> Inventory.contains(4021),30,"M'speak amulet was not observed");
+			WorkflowScript.require(Inventory.contains(1759),"Ball of wool is missing");
+			WorkflowScript.require(Inventory.get(1759).useOn(Inventory.get(4022)),"M'speak amulet could not be strung");
+			WorkflowScript.awaitTicks(() -> Inventory.contains(4021),30,"M'speak amulet was not observed");
 		}
 		Supplies.equip(4021);
 		if (MonkeyAreas.TEMPLE_DUNGEON.contains(QuestWorkflow.tile()) || MonkeyAreas.north()) leaveTemple();
@@ -44,10 +45,10 @@ final class MonkeyAmulet
 		{
 			MonkeySurvival.protection("melee",true,12);
 			GameObject rope = GameObjects.closest(4881);
-			QuestWorkflow.require(rope != null,"Temple exit rope was not observed");
+			WorkflowScript.require(rope != null,"Temple exit rope was not observed");
 			Travel.to(rope.getTile(),2,"hazardous_travel");
-			QuestWorkflow.require(rope.interact("Climb"),"Temple rope interaction failed");
-			QuestWorkflow.await(() -> !MonkeyAreas.TEMPLE_DUNGEON.contains(QuestWorkflow.tile()),40,"Temple exit was not observed");
+			WorkflowScript.require(rope.interact("Climb"),"Temple rope interaction failed");
+			WorkflowScript.awaitTicks(() -> !MonkeyAreas.TEMPLE_DUNGEON.contains(QuestWorkflow.tile()),40,"Temple exit was not observed");
 		}
 		if (MonkeyMap.PRISON_CLEAR.distance() <= 4)
 		{
@@ -55,7 +56,7 @@ final class MonkeyAmulet
 			Automation.activity("questing");
 			Map<String,Object> moved = Navigation.walk(new Navigation.Journey(MonkeyMap.MONKEY_CHILD_STAGING,0).timeout(120),
 				Map.of("area",Map.of("name","prison","bounds",MonkeyAreas.PRISON_BOUNDS)),null);
-			QuestWorkflow.require("arrived".equals(moved.get("status")) && !MonkeyAreas.prison(),"Monkey child travel failed: " + moved);
+			WorkflowScript.require("arrived".equals(moved.get("status")) && !MonkeyAreas.prison(),"Monkey child travel failed: " + moved);
 			return;
 		}
 		MonkeySurvival.route(MonkeyRoutes.TEMPLE_TO_MONKEY_CHILD,"melee");
@@ -66,7 +67,7 @@ final class MonkeyAmulet
 		if (MonkeyAreas.TEMPLE_DUNGEON.contains(QuestWorkflow.tile())) return;
 		if (MonkeyAreas.south()) prison.enter();
 		if (MonkeyAreas.prison()) prison.escape(false);
-		QuestWorkflow.require(MonkeyAreas.north(),"Temple route must start on northern Ape Atoll");
+		WorkflowScript.require(MonkeyAreas.north(),"Temple route must start on northern Ape Atoll");
 		if (!MonkeyAreas.TEMPLE_GUARD_BUILDING.contains(QuestWorkflow.tile())) MonkeySurvival.route(MonkeyRoutes.PRISON_TO_TEMPLE_ENTRY,"missiles");
 		MonkeySurvival.protection("melee",true,24);
 		approachTrapdoor();
@@ -74,19 +75,19 @@ final class MonkeyAmulet
 		if (trapdoor == null)
 		{
 			GameObject closed = GameObjects.closest(4879);
-			QuestWorkflow.require(closed != null && closed.interact("Open"),"Temple trapdoor did not open");
-			QuestWorkflow.await(() -> GameObjects.closest(object -> (object.getId() == 4879 || object.getId() == 4880) && object.hasAction("Climb-down")) != null,
+			WorkflowScript.require(closed != null && closed.interact("Open"),"Temple trapdoor did not open");
+			WorkflowScript.awaitTicks(() -> GameObjects.closest(object -> (object.getId() == 4879 || object.getId() == 4880) && object.hasAction("Climb-down")) != null,
 				8,"Open temple trapdoor was not observed");
 			trapdoor = GameObjects.closest(object -> (object.getId() == 4879 || object.getId() == 4880) && object.hasAction("Climb-down"));
 		}
-		QuestWorkflow.require(trapdoor.interact("Climb-down"),"Temple descent failed");
-		QuestWorkflow.await(() -> MonkeyAreas.TEMPLE_DUNGEON.contains(QuestWorkflow.tile()),40,"Temple arrival was not observed");
+		WorkflowScript.require(trapdoor.interact("Climb-down"),"Temple descent failed");
+		WorkflowScript.awaitTicks(() -> MonkeyAreas.TEMPLE_DUNGEON.contains(QuestWorkflow.tile()),40,"Temple arrival was not observed");
 	}
 	private void approachTrapdoor()
 	{
 		Map<String,Object> moved = MonkeySurvival.traverse(
 			() -> MonkeyRoutes.TEMPLE_TRAPDOOR_APPROACH.avoiding(guardTiles()),"melee",false);
-		QuestWorkflow.require("arrived".equals(moved.get("status")),"Temple trapdoor approach failed: " + moved);
+		WorkflowScript.require("arrived".equals(moved.get("status")),"Temple trapdoor approach failed: " + moved);
 	}
 	private List<Tile> guardTiles()
 	{

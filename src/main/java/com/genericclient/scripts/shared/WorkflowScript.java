@@ -32,7 +32,7 @@ public abstract class WorkflowScript extends AbstractScript
 		return player;
 	}
 
-	protected static void require(boolean condition, String message)
+	public static void require(boolean condition, String message)
 	{
 		if (!condition) throw new IllegalStateException(message);
 	}
@@ -40,5 +40,10 @@ public abstract class WorkflowScript extends AbstractScript
 	protected static void await(Condition condition, long timeout, String message)
 	{
 		require(Sleep.sleepUntil(condition, timeout), message);
+	}
+
+	public static void awaitTicks(Condition condition, int ticks, String message)
+	{
+		require(Sleep.sleepUntil(condition, ticks * 600L), message);
 	}
 }

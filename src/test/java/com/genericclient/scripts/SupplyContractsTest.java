@@ -14,7 +14,7 @@ public class SupplyContractsTest
     @Test public void purchasesOnlyAfterTheExchangeWindowOpensAndPreservesTheReserve()
     {
         java.util.concurrent.atomic.AtomicInteger offerChecks = new java.util.concurrent.atomic.AtomicInteger();
-        CatalogEnvironment game = exchange(offerChecks,Map.of("status","placed","result","ge_offer_pending","quantity_bought",1,"spent",3000));
+        CatalogEnvironment game = exchange(offerChecks,Map.of("status","placed","result","ge_offer_pending","quantity_bought",1,"spent",3000),1);
         game.run();
         assertEquals(Map.of("supplied",2),game.result);
         assertEquals(5_000_000,(int)game.bank.get(995));
@@ -27,7 +27,7 @@ public class SupplyContractsTest
         for (String status : List.of("rejected","placed"))
         {
             java.util.concurrent.atomic.AtomicInteger checks = new java.util.concurrent.atomic.AtomicInteger();
-            CatalogEnvironment game = exchange(checks,Map.of("status",status,"result","invalid_offer"));
+            CatalogEnvironment game = exchange(checks,Map.of("status",status,"result","invalid_offer"),1);
             try { game.run(); fail("A terminal purchase result was retried"); }
             catch (IllegalStateException expected)
             {
@@ -39,7 +39,18 @@ public class SupplyContractsTest
         }
     }
 
-    private static CatalogEnvironment exchange(java.util.concurrent.atomic.AtomicInteger offerChecks, Map<String,Object> firstReply)
+    @Test public void anOfferThatStaysOpenStopsAfterThreeChecks()
+    {
+        java.util.concurrent.atomic.AtomicInteger checks = new java.util.concurrent.atomic.AtomicInteger();
+        CatalogEnvironment game = exchange(checks,Map.of("status","placed","result","ge_offer_pending"),3);
+        try { game.run(); fail("An open offer was checked without a bound"); }
+        catch (IllegalStateException expected) { assertEquals("Purchase offer was still open after three checks: Dragon bones",expected.getMessage()); }
+        assertEquals(3,checks.get());
+        assertFalse(game.bank.containsKey(536));
+        assertNull(game.result);
+    }
+
+    private static CatalogEnvironment exchange(java.util.concurrent.atomic.AtomicInteger offerChecks, Map<String,Object> reply, int replies)
     {
         CatalogEnvironment game = new CatalogEnvironment(new WorkflowScript()
         {
@@ -82,11 +93,11 @@ public class SupplyContractsTest
                     assertEquals(2,arguments.get("quantity"));
                     assertEquals(3000,arguments.get("maximum_unit_price"));
                     assertEquals(5_000_000L,arguments.get("minimum_cash_reserve"));
-                    if (offerChecks.incrementAndGet() == 1)
+                    if (offerChecks.incrementAndGet() <= replies)
                     {
                         // A terminal response can follow an offer that already reserved the coins.
                         inventory.remove(995);
-                        return firstReply;
+                        return reply;
                     }
                     bank.put(536,2);
                     return Map.of("status","complete");

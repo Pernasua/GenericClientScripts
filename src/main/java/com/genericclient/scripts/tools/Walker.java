@@ -23,10 +23,8 @@ public final class Walker extends WorkflowScript
 	@Override protected Object runWorkflow()
 	{
 		String place = Automation.input("destination");
-		Tile destination = PLACES.get(place);
-		require(destination != null,"Unknown destination: " + place);
 		Automation.overlay(Map.of("Destination",place,"State","Walking"));
-		Travel.to(destination, place.equals("varrock_center") || place.equals("edgeville_bank") ? 3 : 4);
+		Travel.to(PLACES.get(place),3);
 		Automation.phase("travel." + place + ".arrived");
 		return Map.of("status","arrived","destination",place);
 	}

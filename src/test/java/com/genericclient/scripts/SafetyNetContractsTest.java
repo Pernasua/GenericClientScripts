@@ -48,15 +48,22 @@ public class SafetyNetContractsTest
         }
     }
 
-    @Test public void pendingRecoveryAndDispatchedFoodDoNotCauseAnotherMeal()
+    @Test public void aConfiguredGuardOwnsTheMeal()
     {
-        for (String result : List.of("emergency_consumable_dispatched","safety_recovery_already_running"))
+        Map<String,String> outcomes=Map.of(
+            "emergency_consumable_dispatched","dispatched",
+            "emergency_escape_no_longer_needed","dispatched",
+            "no_approved_emergency_consumable_available","rejected",
+            "safety_recovery_already_running","rejected",
+            "safety_recovery_disabled_by_script","complete",
+            "safety_recovery_not_needed_no_emergency","complete");
+        for (Map.Entry<String,String> outcome : outcomes.entrySet())
         {
             SceneScenario game=attackedAccount();
             game.input=(type,args) ->
             {
                 assertEquals("safety.recover",type);
-                game.receipt=Map.of("status","complete","result",result);
+                game.receipt=Map.of("status",outcome.getValue(),"result",outcome.getKey());
             };
             assertEquals(600,game.run());
             assertEquals(1,game.gameInputs);
@@ -65,7 +72,7 @@ public class SafetyNetContractsTest
         }
     }
 
-    @Test public void unavailableEmergencyRecoveryUsesOnlyCarriedEdibleFood()
+    @Test public void withoutAConfiguredGuardTheSafetyNetEatsOnlyCarriedEdibleFood()
     {
         for (boolean food : List.of(false,true))
         {
@@ -74,7 +81,7 @@ public class SafetyNetContractsTest
             game.inventory.put(6206,1);
             game.input=(type,args) ->
             {
-                if (type.equals("safety.recover")) game.receipt=Map.of("status","rejected","result","no_emergency_route");
+                if (type.equals("safety.recover")) game.receipt=Map.of("status","rejected","result","safety_net_not_configured");
                 else
                 {
                     assertEquals("item.interact",type);

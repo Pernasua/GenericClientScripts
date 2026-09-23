@@ -28,6 +28,10 @@ a packed varp may also contain flags that are not part of the stage.
 **Cooperative stop:** A request to finish the current bounded action before ending
 the workflow.
 
+**Escape:** A quest's way out of its hazardous area when it stops safely or a
+recovery fails: carried teleport jewellery, otherwise a walk to a known safe tile.
+Without a hazardous area or a walking route out of it, the quest stops in place.
+
 **Cash reserve:** The 5,000,000 coins that restocking must leave available.
 
 **Intent:** A short action sequence that shares one behavior boundary. Nested

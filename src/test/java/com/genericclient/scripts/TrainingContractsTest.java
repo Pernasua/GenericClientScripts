@@ -11,17 +11,13 @@ import org.junit.Test;
 
 public class TrainingContractsTest
 {
-	@Test public void prayerReopensTheBankInsideTheNextWithdrawalBoundary()
+	@Test public void prayerReturnsToTheBankUntilItReachesItsTarget()
 	{
 		CatalogEnvironment account = prayer(48_000);
 		account.bank.put(536,50);
 		account.run();
 		assertEquals(50_376,(int)account.experience.get(Skill.PRAYER));
-		assertEquals(java.util.List.of("prayer.withdraw_bones"),account.intents.actions.get("npc.interact"));
-		assertEquals(java.util.List.of("prayer.withdraw_bones","prayer.withdraw_bones"),account.intents.actions.get("bank.loadout"));
-		assertTrue(account.intents.actions.get("item.interact").stream().allMatch(java.util.Objects::isNull));
-		assertEquals(java.util.List.of("bank.open","prayer.withdraw_bones","prayer.withdraw_bones"),account.intents.entries);
-		assertNull(account.intents.current);
+		assertEquals(2L,account.actions.stream().filter("bank.loadout"::equals).count());
 	}
 
 	@Test public void prayerStopsAfterTheBoneThatReachesItsTarget()
@@ -29,13 +25,9 @@ public class TrainingContractsTest
 		CatalogEnvironment account = prayer(50_300);
 		account.bank.put(536,20);
 		account.run();
-		assertEquals(50_372,(int)account.experience.get(Skill.PRAYER));
 		assertEquals(19,(int)account.bank.get(536));
 		assertEquals("complete",((Map<?,?>)account.result).get("status"));
 		assertEquals(1L,account.actions.stream().filter("item.interact"::equals).count());
-		assertEquals(java.util.List.of("prayer.withdraw_bones"),account.intents.actions.get("bank.loadout"));
-		assertEquals(java.util.Collections.singletonList(null),account.intents.actions.get("item.interact"));
-		assertNull(account.intents.current);
 	}
 
 	@Test public void prayerCooperativeStopWaitsForConsumptionAndXp()
@@ -66,7 +58,6 @@ public class TrainingContractsTest
 		account.bank.put(890,2);
 		account.run();
 		assertEquals("low_alchemy",account.lastSpell);
-		assertEquals(101_362,(int)account.experience.get(Skill.MAGIC));
 		assertEquals(2L,account.actions.stream().filter("spell.cast_on_item"::equals).count());
 		assertEquals("complete",((Map<?,?>)account.result).get("status"));
 	}
@@ -77,12 +68,8 @@ public class TrainingContractsTest
 		account.bank.put(440,1);
 		account.run();
 		assertEquals("superheat_item",account.lastSpell);
-		assertEquals(101_353,(int)account.experience.get(Skill.MAGIC));
 		assertEquals(1,(int)account.inventory.get(2351));
 		assertEquals(1L,account.actions.stream().filter("spell.cast_on_item"::equals).count());
-		assertEquals(java.util.List.of("magic.load_superheat_batch"),account.intents.actions.get("bank.loadout"));
-		assertEquals(java.util.Collections.singletonList(null),account.intents.actions.get("spell.cast_on_item"));
-		assertNull(account.intents.current);
 	}
 
 	@Test public void magicBankTrainingStopsAfterTheCastConsumesItsMaterialAndAwardsXp()

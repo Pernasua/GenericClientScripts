@@ -11,6 +11,9 @@ import org.junit.Test;
 
 public class MollyContractsTest
 {
+    private static final Map<String,Integer> MOLLY_ROOM=Map.of("x",10001,"y",10001,"plane",0);
+    private static final Map<String,Integer> CONTROL_ROOM=Map.of("x",10001,"y",10002,"plane",0);
+
     @Test public void mollyAcceptsTheInvitationBeforeOperatingTheGame()
     {
         EventScenario game = mollyGame(Map.of("x",10001,"y",10001,"plane",0));
@@ -27,7 +30,7 @@ public class MollyContractsTest
                 assertEquals("molly.accept_invitation",game.intents.current);
                 game.nextTick = () ->
                 {
-                    game.world = Map.of("x",10001,"y",10001,"plane",0);
+                    game.world = MOLLY_ROOM;
                     game.closeDialogue();
                 };
             }
@@ -56,8 +59,21 @@ public class MollyContractsTest
                 "Claw control panel did not open" : "Molly's reward dialogue failed";
             try { game.run(); fail("The rejected interaction was ignored"); }
             catch (IllegalStateException failure) { assertEquals(reason,failure.getMessage()); }
-            assertNull(game.intents.current);
         }
+    }
+
+    @Test public void aDoorThatLeavesThePlayerInPlaceStopsBeforeThePanel()
+    {
+        EventScenario game = mollyGame(Map.of("x",10001,"y",10001,"plane",0));
+        BiConsumer<String,Map<String,Object>> input = game.input;
+        game.input = (type,args) ->
+        {
+            input.accept(type,args);
+            if (type.equals("object.interact")) game.nextTick = null;
+        };
+        try { game.run(); fail("An uncrossed door was treated as crossed"); }
+        catch (IllegalStateException failure) { assertEquals("Molly's door was not crossed",failure.getMessage()); }
+        assertEquals(1,game.intents.actions.get("object.interact").size());
     }
 
     @Test public void missingClawOrTwinCannotCauseBlindControlInputs()
@@ -70,7 +86,6 @@ public class MollyContractsTest
             try { game.run(); fail("The missing scene entity was ignored"); }
             catch (IllegalStateException failure) { assertEquals("Molly's twin was not captured",failure.getMessage()); }
             assertFalse(game.intents.actions.containsKey("ui.click"));
-            assertNull(game.intents.current);
         }
     }
 
@@ -90,7 +105,6 @@ public class MollyContractsTest
         };
         try { game.run(); fail("Leaving without the reward completed the event"); }
         catch (IllegalStateException failure) { assertEquals("Molly's reward was not observed",failure.getMessage()); }
-        assertNull(game.intents.current);
     }
 
     @Test public void mollyAlignsTheClawWithTheMatchingTwinAndReturnsForTheReward()
@@ -134,7 +148,7 @@ public class MollyContractsTest
     private static EventScenario mollyGame(Map<String,Integer> target)
     {
         EventScenario game=new EventScenario(new Molly(),6738);
-        game.world=Map.of("x",10001,"y",10001,"plane",0);
+        game.world=MOLLY_ROOM;
         game.npc(342,"Molly",10001,10001,"Talk-to");
         game.npc(5468,"Evil twin",target.get("x"),target.get("y"));
         game.npc(5469,"Evil twin",10001,10001);
@@ -147,8 +161,9 @@ public class MollyContractsTest
             {
                 case "npc.interact":
                     assertEquals(342,args.get("id"));
-                    if (talks.incrementAndGet()==1) game.nextTick=game::continueDialogue;
-                    else game.nextTick=() ->
+                    if (talks.incrementAndGet()==1) { game.nextTick=game::continueDialogue; break; }
+                    assertEquals(MOLLY_ROOM,game.world);
+                    game.nextTick=() ->
                     {
                         game.world=Map.of("x",3165,"y",3491,"plane",0);
                         game.depart(); game.message("Your reward is: 10 x Coins.");
@@ -157,8 +172,15 @@ public class MollyContractsTest
                 case "dialogue.continue":game.nextTick=game::closeDialogue; break;
                 case "object.interact":
                     if (args.get("id").equals(20813))
+                    {
+                        assertEquals(CONTROL_ROOM,game.world);
                         game.nextTick=() -> { for (int id=18153475;id<=18153482;id++) game.widget(id,""); };
-                    else assertEquals("Open",args.get("action"));
+                    }
+                    else
+                    {
+                        assertEquals("Open",args.get("action"));
+                        game.nextTick=() -> game.world=game.world.equals(MOLLY_ROOM) ? CONTROL_ROOM : MOLLY_ROOM;
+                    }
                     break;
                 case "ui.click":moveClaw(game,claw,((Number)args.get("widget_id")).intValue(),target); break;
                 default:throw new AssertionError("Unexpected Molly input: "+type);

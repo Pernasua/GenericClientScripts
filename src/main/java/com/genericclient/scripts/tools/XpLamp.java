@@ -4,6 +4,7 @@ import com.genericclient.script.Automation;
 import com.genericclient.script.ScriptSettings;
 import com.genericclient.scripts.shared.Interfaces;
 import com.genericclient.scripts.shared.WorkflowScript;
+import java.util.Locale;
 import java.util.Map;
 import org.dreambot.api.methods.container.impl.Inventory;
 import org.dreambot.api.methods.skills.Skill;
@@ -24,13 +25,13 @@ public final class XpLamp extends WorkflowScript
 		Map.entry(Skill.THIEVING,15728652),Map.entry(Skill.SLAYER,15728655),Map.entry(Skill.FIREMAKING,15728661));
 	@Override protected Object runWorkflow()
 	{
-		Skill skill = Skill.valueOf(Automation.input("skill").toUpperCase(java.util.Locale.ROOT));
+		Skill skill = Skill.valueOf(Automation.input("skill").toUpperCase(Locale.ROOT));
 		int cap = skill == Skill.ATTACK ? 80 : skill == Skill.DEFENCE ? 75 : skill == Skill.PRAYER ? 77 : 99;
 		if (Skills.getRealLevel(skill) >= cap) return Map.of("status","hard_cap_reached","cap",cap);
 		int beforeXp = Skills.getExperience(skill);
 		int lamps = Inventory.count(2528);
 		if (lamps == 0) return Map.of("status","lamp_not_carried");
-		Automation.activity("general",WorkflowScript.NO_DISCRETIONARY);
+		Automation.activity("general",NO_DISCRETIONARY);
 		return Automation.intent("xp_lamp.use", () ->
 		{
 			require(Inventory.interact(2528,"Rub"),"Lamp interface did not open");
@@ -41,7 +42,7 @@ public final class XpLamp extends WorkflowScript
 			Interfaces.click(15728667);
 			await(() -> Skills.getExperience(skill) > beforeXp && Inventory.count(2528) < lamps,12000,"Lamp reward was not verified");
 			return Map.of("status","complete","skill",skill.name(),"gained_xp",Skills.getExperience(skill)-beforeXp,
-				"final_level",Skills.getRealLevel(skill),"lamps_after",Inventory.count(2528));		});
-
+				"final_level",Skills.getRealLevel(skill),"lamps_after",Inventory.count(2528));
+		});
 	}
 }

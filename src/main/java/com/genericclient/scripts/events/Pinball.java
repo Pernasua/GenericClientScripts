@@ -24,7 +24,7 @@ public final class Pinball extends WorkflowScript
 		require(score >= 10 && PlayerSettings.getBitValue(2122) == 1,"Pinball did not reach its completion state");
 		GameObject exit = GameObjects.closest(9293);
 		require(exit != null && exit.interact("Exit"),"Pinball exit failed");
-		EventSupport.await(() -> EventSupport.message(started,"your reward is:") || EventSupport.message(started,"you were awarded"),
+		awaitTicks(() -> EventSupport.message(started,"your reward is:") || EventSupport.message(started,"you were awarded"),
 			40,"Pinball reward was not observed");
 		return Map.of("status","solved","score",score);
 	}

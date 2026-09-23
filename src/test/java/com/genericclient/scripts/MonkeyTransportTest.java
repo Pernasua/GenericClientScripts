@@ -1,6 +1,7 @@
 package com.genericclient.scripts;
 
 import static org.junit.Assert.*;
+import com.genericclient.scripts.shared.WorkflowScript;
 import java.util.Map;
 import org.dreambot.api.methods.map.Tile;
 import org.junit.Test;
@@ -80,7 +81,7 @@ public class MonkeyTransportTest
         game.input = (type,args) ->
         {
             assertNotEquals("Transport must count as owned automation","manual",game.activity);
-            assertEquals(Map.of("breaks",false,"cursor_release","none","fidget","none"),game.policy);
+            assertEquals(WorkflowScript.NO_DISCRETIONARY,game.policy);
             assertEquals(false,game.behavior.get("emergency_escape"));
             switch (type)
             {
@@ -136,7 +137,7 @@ public class MonkeyTransportTest
         assertEquals(new Tile(2722,2767),game.position);
         assertTrue(game.inventory.containsKey(4033));
         assertTrue(game.phaseActivities.stream().noneMatch("manual"::equals));
-        assertTrue(game.phaseOptions.stream().allMatch(Map.of("policy",Map.of("breaks",false,"cursor_release","none","fidget","none"))::equals));
+        assertTrue(game.phaseOptions.stream().allMatch(Map.of("policy",WorkflowScript.NO_DISCRETIONARY)::equals));
         assertEquals(false,game.behavior.get("emergency_escape"));
         assertEquals(2,zooJourneys.get());
         assertEquals(2,chatterLines.get());

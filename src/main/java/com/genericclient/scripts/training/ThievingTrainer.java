@@ -36,7 +36,8 @@ public final class ThievingTrainer extends WorkflowScript
 		food(1891,4),food(1893,4),food(1895,4),food(1897,5),food(1899,5),food(1901,5),food(2309,5));
 	@Override protected Object runWorkflow()
 	{
-		int goal = Skills.getExperienceForLevel(25);
+		int target = Integer.parseInt(Automation.input("target_level"));
+		int goal = Skills.getExperienceForLevel(target);
 		require(Skills.getRealLevel(Skill.THIEVING) >= 5, "The bakery stall requires Thieving 5");
 		if (Skills.getExperience(Skill.THIEVING) >= goal) return Map.of("status","already_complete");
 		position();
@@ -52,7 +53,7 @@ public final class ThievingTrainer extends WorkflowScript
 			await(() -> stall() != null, 9600, "Bakery stall did not respawn");
 			int beforeXp = Skills.getExperience(Skill.THIEVING);
 			int beforeSlots = Inventory.emptySlotCount();
-			Progress.training(Skill.THIEVING, 25, "Stealing baked goods");
+			Progress.training(Skill.THIEVING, target, "Stealing baked goods");
 			require(stall().interact("Steal-from"), "Stall interaction failed");
 			await(() -> Skills.getExperience(Skill.THIEVING) > beforeXp && Inventory.emptySlotCount() < beforeSlots,
 				7200, "Thieving XP and stolen goods were not observed");

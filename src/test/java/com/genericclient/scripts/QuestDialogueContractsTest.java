@@ -114,19 +114,14 @@ public class QuestDialogueContractsTest
         assertEquals(List.of("npc.interact","dialogue.choose","dialogue.continue"),game.actions);
     }
 
-    @Test public void alreadyCompletedQuestsDoNotPrepareOrReplayTheirStages()
+    @Test public void anAlreadyCompletedQuestDoesNotPrepareOrReplayItsStages()
     {
-        Map<String,Integer> quests=Map.of("witchs_house",226,"waterfall",65,"tree_gnome_village",111,
-            "fight_arena",17,"the_grand_tree",150,"monkey_madness_i",365,"romeo__juliet",144,"goblin_diplomacy",62);
-        for (Map.Entry<String,Integer> quest : quests.entrySet())
-        {
-            QuestScenario game=new QuestScenario(quest.getKey(),quest.getValue(),0,new Tile(3165,3491));
-            game.finished=true;
-            game.scope="complete";
-            game.run();
-            assertEquals(Map.of("status","complete","quest",quest.getKey().equals("waterfall") ? "waterfall_quest" : quest.getKey()),game.result);
-            assertTrue(game.actions.isEmpty());
-        }
+        QuestScenario game=new QuestScenario("witchs_house",226,0,new Tile(3165,3491));
+        game.finished=true;
+        game.scope="complete";
+        game.run();
+        assertEquals(Map.of("status","complete","quest","witchs_house"),game.result);
+        assertTrue(game.actions.isEmpty());
     }
 
     @Test public void stoppingSafelyRequiresAnObservedTeleportArrival()
@@ -167,6 +162,22 @@ public class QuestDialogueContractsTest
         }
     }
 
+    @Test public void stoppingSafelyWithoutJewelleryWalksOutOfTheQuestArea()
+    {
+        QuestScenario game=montai();
+        game.buttons.add("stop_safely");
+        game.input=(type,args) ->
+        {
+            assertEquals("walk.to",type);
+            assertEquals(Map.of("x",2505,"y",3190,"plane",0),args.get("destination"));
+            game.position=new Tile(2505,3190);
+        };
+        game.run();
+        assertEquals(Map.of("status","stopped","quest","tree_gnome_village"),game.result);
+        assertEquals(new Tile(2505,3190),game.position);
+        assertEquals(1,game.actions.stream().filter("walk.to"::equals).count());
+    }
+
     @Test public void messageBoxesAdvanceOncePerNewObservation()
     {
         QuestScenario game=montai();
@@ -197,7 +208,6 @@ public class QuestDialogueContractsTest
         game.run();
         assertEquals(2,boxes.get());
         assertEquals(Map.of("status","checkpoint","quest","tree_gnome_village","stage",4),game.result);
-        assertNull(game.intents.current);
     }
 
     @Test public void unexpectedAndRejectedChoicesStopTheConversation()
@@ -224,7 +234,6 @@ public class QuestDialogueContractsTest
             }
             assertEquals(offered ? 1 : 0,game.actions.stream().filter("dialogue.choose"::equals).count());
             assertEquals(3,game.stage);
-            assertNull(game.intents.current);
         }
     }
 

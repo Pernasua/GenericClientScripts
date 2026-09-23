@@ -46,10 +46,6 @@ final class EventSupport
 		}
 		return false;
 	}
-	static void await(Condition condition, int ticks, String failure)
-	{
-		if (!Sleep.sleepUntil(condition,ticks * 600L)) throw new IllegalStateException(failure);
-	}
 	static void enter(String name, Condition ready, String... choices)
 	{
 		if (ready.verify()) return;
@@ -62,7 +58,7 @@ final class EventSupport
 				Conversations.advance(choices);
 				Sleep.sleepTicks(1);
 			}
-			throw new IllegalStateException("Random-event activity did not open");		});
-
+			throw new IllegalStateException("Random-event activity did not open");
+		});
 	}
 }

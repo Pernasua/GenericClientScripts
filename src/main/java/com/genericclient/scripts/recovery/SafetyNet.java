@@ -33,7 +33,8 @@ public final class SafetyNet extends AbstractScript
 				Automation.finish(Map.of("status","complete","result","safety_net_active_combat_escape"));
 				return -1;
 			}
-			if (!outcome.equals("emergency_consumable_dispatched") && !outcome.equals("safety_recovery_already_running"))
+			// A configured guard owns the meal through its approved consumables, so the safety net eats only when no guard exists.
+			if (outcome.equals("safety_net_not_configured"))
 			{
 				Item food = Inventory.get(item -> item.hasAction("Eat"));
 				if (food != null) food.interact("Eat");

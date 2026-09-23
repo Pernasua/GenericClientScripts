@@ -44,22 +44,22 @@ final class MonkeyTravel
 		{
 			quest.walk(MonkeyMap.SHIPYARD_GATE_INSIDE,1,false);
 			GameObject gate = GameObjects.closest(2438);
-			QuestWorkflow.require(gate != null && gate.interact("Open"),"Shipyard exit gate did not open");
+			WorkflowScript.require(gate != null && gate.interact("Open"),"Shipyard exit gate did not open");
 			quest.walk(MonkeyMap.SHIPYARD_GATE_OUTSIDE,0,false);
-			QuestWorkflow.require(!MonkeyAreas.SHIPYARD.contains(QuestWorkflow.tile()),"Shipyard exit was not observed");
+			WorkflowScript.require(!MonkeyAreas.SHIPYARD.contains(QuestWorkflow.tile()),"Shipyard exit was not observed");
 		}
-		QuestWorkflow.require(QuestWorkflow.tile().getZ() == 0 || MonkeyAreas.tree(),"King Narnode travel cannot resume from this location");
+		WorkflowScript.require(QuestWorkflow.tile().getZ() == 0 || MonkeyAreas.tree(),"King Narnode travel cannot resume from this location");
 		journey(MonkeyMap.KING_NARNODE,3,600);
-		QuestWorkflow.require(QuestWorkflow.npc(GnomeTravel.KING) != null,"King Narnode was not observed after travel");
+		WorkflowScript.require(QuestWorkflow.npc(GnomeTravel.KING) != null,"King Narnode was not observed after travel");
 	}
 
 	void daero()
 	{
 		if (QuestWorkflow.npc(DAERO) != null) return;
-		QuestWorkflow.require(MonkeyAreas.tree() || MonkeyAreas.STRONGHOLD_TRANSPORT.contains(QuestWorkflow.tile()),
+		WorkflowScript.require(MonkeyAreas.tree() || MonkeyAreas.STRONGHOLD_TRANSPORT.contains(QuestWorkflow.tile()),
 			"Daero travel cannot resume from this location");
 		journey(MonkeyMap.DAERO,5,600);
-		QuestWorkflow.require(QuestWorkflow.npc(DAERO) != null,"Daero was not observed after travel");
+		WorkflowScript.require(QuestWorkflow.npc(DAERO) != null,"Daero was not observed after travel");
 	}
 
 	void shipyardGate() { journey(MonkeyMap.SHIPYARD_GATE,3,600); }
@@ -68,7 +68,7 @@ final class MonkeyTravel
 	{
 		Automation.activity("travel",Inventory.contains(4033) ? WorkflowScript.NO_DISCRETIONARY : Map.of());
 		Map<String,Object> receipt = Navigation.walk(new Navigation.Journey(destination,within).timeout(ticks),Map.of("dialogue",true),null);
-		QuestWorkflow.require("arrived".equals(receipt.get("status")),"Travel did not reach " + destination);
+		WorkflowScript.require("arrived".equals(receipt.get("status")),"Travel did not reach " + destination);
 	}
 
 	void ape()
@@ -93,16 +93,17 @@ final class MonkeyTravel
 	private void sail()
 	{
 		String continuation = null;
-		while (true)
+		for (int attempt = 0; attempt < 24; attempt++)
 		{
-			QuestWorkflow.require(SnapshotData.action("consumable.cure_poison",Map.of()),"Poison could not be cured before sailing");
+			WorkflowScript.require(SnapshotData.action("consumable.cure_poison",Map.of()),"Poison could not be cured before sailing");
 			Automation.activity("travel",Inventory.contains(4033) ? WorkflowScript.NO_DISCRETIONARY : Map.of());
 			Map<String,Object> receipt = Navigation.walk(new Navigation.Journey(MonkeyMap.APE_ATOLL_LANDING,1).timeout(300),
 				Map.of("dialogue",true,"poisoned",true),continuation);
 			if ("arrived".equals(receipt.get("status"))) return;
-			QuestWorkflow.require("interrupted".equals(receipt.get("status")) && "poisoned".equals(receipt.get("reason")) &&
+			WorkflowScript.require("interrupted".equals(receipt.get("status")) && "poisoned".equals(receipt.get("reason")) &&
 				receipt.get("continuation") instanceof String,"Ape Atoll sailing did not arrive: " + receipt);
 			continuation = (String)receipt.get("continuation");
 		}
+		throw new IllegalStateException("Ape Atoll sailing interruption limit reached");
 	}
 }

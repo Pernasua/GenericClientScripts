@@ -6,6 +6,7 @@ import com.genericclient.script.SnapshotData;
 import com.genericclient.script.Navigation;
 import com.genericclient.script.Navigation.Journey;
 import com.genericclient.scripts.shared.Jewellery;
+import com.genericclient.scripts.shared.Safety;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.function.Supplier;
@@ -22,54 +23,52 @@ import org.dreambot.api.wrappers.items.Item;
 
 final class MonkeySurvival
 {
-	private static final int[] RINGS = {2552,2554,2556,2558,2560,2562,2564,2566};
 	private static final int[] PRAYER = {2434,139,141,143};
 	private static final int[] STAMINA = {12625,12627,12629,12631};
 	private MonkeySurvival() {}
 	static void arm(int minimum)
 	{
-		Item ring = Inventory.get(item -> Arrays.stream(RINGS).anyMatch(id -> item.getId() == id));
-		QuestWorkflow.require(ring != null,"An escape ring must be carried before hazardous travel");
-		QuestWorkflow.require(SnapshotData.action("safety.configure",Map.of("minimum_hitpoints",minimum,
-			"consumables",List.of(Map.of("id",379,"action","Eat","heal_amount",12)),"continue_after_consumable",true,"allow_overheal",true,
-			"escape",Map.of("type","inventory_dialogue","item_id",ring.getId(),"alternative_item_ids",Arrays.stream(RINGS).boxed().collect(java.util.stream.Collectors.toList()),
-				"action","Rub","choice","Castle Wars Arena","x",2440,"y",3089,"plane",0,"within",10))),"Monkey Madness emergency guard failed");
+		int[] rings = Jewellery.DUELING_RING.ids;
+		Item ring = Inventory.get(item -> Arrays.stream(rings).anyMatch(id -> item.getId() == id));
+		WorkflowScript.require(ring != null,"An escape ring must be carried before hazardous travel");
+		Safety.guard(minimum,Safety.lobster(),true,Map.of("type","inventory_dialogue","item_id",ring.getId(),
+			"alternative_item_ids",Arrays.stream(rings).boxed().collect(java.util.stream.Collectors.toList()),
+			"action","Rub","choice","Castle Wars Arena","x",2440,"y",3089,"plane",0,"within",10));
 	}
 	static void behavior(boolean retaliate)
 	{
-		QuestWorkflow.require(SnapshotData.action("client.behaviors.configure",Map.of("auto_retaliate",retaliate,"emergency_escape",!Inventory.contains(4033),"combat_prayer",false)),
-			"Monkey Madness behavior configuration failed");
+		Safety.behaviors(retaliate,!Inventory.contains(4033),false);
 	}
 	static void protection(String style, boolean enabled, int minimum)
 	{
 		if (enabled) restore(minimum);
-		QuestWorkflow.require(SnapshotData.action("prayer.set",Map.of("prayer","protect_from_"+style,"enabled",enabled)),"Protection prayer failed: " + style);
+		WorkflowScript.require(SnapshotData.action("prayer.set",Map.of("prayer","protect_from_"+style,"enabled",enabled)),"Protection prayer failed: " + style);
 	}
 	static void restore(int minimum)
 	{
 		for (int dose = 0; dose < 4 && Skills.getBoostedLevel(Skill.PRAYER) < minimum; dose++)
 		{
 			Item potion = Inventory.get(item -> Arrays.stream(PRAYER).anyMatch(id -> item.getId() == id));
-			QuestWorkflow.require(potion != null,"Prayer restoration is unavailable");
+			WorkflowScript.require(potion != null,"Prayer restoration is unavailable");
 			int before = Skills.getBoostedLevel(Skill.PRAYER);
-			QuestWorkflow.require(potion.interact("Drink"),"Prayer potion interaction failed");
-			QuestWorkflow.await(() -> Skills.getBoostedLevel(Skill.PRAYER) > before,6,"Prayer restoration was not observed");
+			WorkflowScript.require(potion.interact("Drink"),"Prayer potion interaction failed");
+			WorkflowScript.awaitTicks(() -> Skills.getBoostedLevel(Skill.PRAYER) > before,6,"Prayer restoration was not observed");
 		}
-		QuestWorkflow.require(Skills.getBoostedLevel(Skill.PRAYER) >= minimum,"Prayer reserve was not restored");
+		WorkflowScript.require(Skills.getBoostedLevel(Skill.PRAYER) >= minimum,"Prayer reserve was not restored");
 	}
 	static void maintain()
 	{
-		QuestWorkflow.require(SnapshotData.action("consumable.cure_poison",Map.of()),"Poison could not be cured");
+		WorkflowScript.require(SnapshotData.action("consumable.cure_poison",Map.of()),"Poison could not be cured");
 		if (PlayerSettings.getBitValue(25) > 0 || Walking.getRunEnergy() >= 60) return;
 		Item potion = Inventory.get(item -> Arrays.stream(STAMINA).anyMatch(id -> item.getId() == id));
-		QuestWorkflow.require(potion != null && potion.interact("Drink"),"Stamina potion is unavailable");
-		QuestWorkflow.await(() -> PlayerSettings.getBitValue(25) > 0,6,"Stamina effect was not observed");
+		WorkflowScript.require(potion != null && potion.interact("Drink"),"Stamina potion is unavailable");
+		WorkflowScript.awaitTicks(() -> PlayerSettings.getBitValue(25) > 0,6,"Stamina effect was not observed");
 	}
 	static void route(Journey journey, String prayer)
 	{
 		Map<String,Object> receipt = traverse(() -> journey, prayer, false);
-		QuestWorkflow.require("arrived".equals(receipt.get("status")), "Monkey Madness journey failed: " + receipt);
-		QuestWorkflow.require(!MonkeyAreas.prison(), "Monkey Madness journey ended in prison");
+		WorkflowScript.require("arrived".equals(receipt.get("status")), "Monkey Madness journey failed: " + receipt);
+		WorkflowScript.require(!MonkeyAreas.prison(), "Monkey Madness journey ended in prison");
 	}
 
 	static Map<String,Object> traverse(Supplier<Journey> journey, String prayer, boolean dungeon)

@@ -40,6 +40,8 @@ public class ThievingContractsTest
 			input = this::interact;
 		}
 
+		@Override public Map<String,Object> inputs() { return Map.of("target_level","25","method","auto"); }
+
 		@Override public Object read(String subject, Map<String,Object> query)
 		{
 			if (subject.equals("bank")) return Map.of("open",bankOpen);

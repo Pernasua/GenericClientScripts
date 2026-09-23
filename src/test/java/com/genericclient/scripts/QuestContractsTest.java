@@ -2,6 +2,7 @@ package com.genericclient.scripts;
 
 import static org.junit.Assert.*;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.dreambot.api.methods.map.Tile;
 import org.junit.Test;
 
@@ -51,6 +52,43 @@ public class QuestContractsTest
         game.run();
         assertEquals("checkpoint",((Map<?,?>)game.result).get("status"));
         assertEquals(1,(int)game.inventory.get(587));
+    }
+
+    @Test public void trackersAreApproachedOnlyWhenOutOfSightAndNeverOntoTheirTile()
+    {
+        for (boolean sighted : new boolean[]{true,false})
+        {
+            QuestScenario game = new QuestScenario("tree_gnome_village",111,4,new Tile(2524,3261));
+            game.varbits.put(599L,1);
+            game.varbits.put(601L,1);
+            game.npc(4976,"Tracker gnome 2",new Tile(2524,3257),"Talk-to");
+            game.npcs.get(0).put("line_of_sight",sighted);
+            game.object(2181,"Ballista",new Tile(2509,3211),"Fire");
+            AtomicInteger approaches = new AtomicInteger();
+            game.input = (type,args) ->
+            {
+                if (type.equals("walk.to"))
+                {
+                    Map<?,?> destination = (Map<?,?>)args.get("destination");
+                    if (destination.get("y").equals(3257))
+                    {
+                        assertEquals("The fenced tracker's own tile is unreachable",1,args.get("within"));
+                        approaches.incrementAndGet();
+                        game.position = new Tile(2524,3256);
+                    }
+                    else game.position = new Tile((Integer)destination.get("x"),(Integer)destination.get("y"));
+                }
+                else if (type.equals("npc.interact")) game.transitions.add(() -> game.varbits.put(600L,1));
+                else
+                {
+                    assertEquals("object.interact",type);
+                    game.transitions.add(() -> game.stage = 5);
+                }
+            };
+            game.run();
+            assertEquals(Map.of("status","checkpoint","quest","tree_gnome_village","stage",5),game.result);
+            assertEquals(sighted ? 0 : 1,approaches.get());
+        }
     }
 
     @Test public void witchCheckpointLeavesTheReadyShedFightForACompletionRun()

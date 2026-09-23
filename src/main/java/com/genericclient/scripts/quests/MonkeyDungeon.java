@@ -23,13 +23,13 @@ final class MonkeyDungeon
 		{
 			Travel.to(MonkeyMap.ZOOKNOCK_DUNGEON_ENTRANCE,1,"hazardous_travel");
 			GameObject ladder = GameObjects.closest(4780);
-			QuestWorkflow.require(ladder != null && ladder.interact("Climb-down"),"Zooknock dungeon entrance failed");
-			QuestWorkflow.await(() -> MonkeyAreas.ZOOKNOCK_DUNGEON.contains(QuestWorkflow.tile()),40,"Dungeon entry was not observed");
+			WorkflowScript.require(ladder != null && ladder.interact("Climb-down"),"Zooknock dungeon entrance failed");
+			WorkflowScript.awaitTicks(() -> MonkeyAreas.ZOOKNOCK_DUNGEON.contains(QuestWorkflow.tile()),40,"Dungeon entry was not observed");
 		}
 		Map<String,Object> moved = MonkeySurvival.traverse(() -> MonkeyRoutes.ZOOKNOCK_DUNGEON,"melee",true);
-		QuestWorkflow.require("arrived".equals(moved.get("status")),"Zooknock journey failed: " + moved);
+		WorkflowScript.require("arrived".equals(moved.get("status")),"Zooknock journey failed: " + moved);
 		clearAttacker();
-		QuestWorkflow.require(QuestWorkflow.npc(7170) != null,"Zooknock was not observed");
+		WorkflowScript.require(QuestWorkflow.npc(7170) != null,"Zooknock was not observed");
 	}
 	void enchantedBar()
 	{
@@ -44,7 +44,7 @@ final class MonkeyDungeon
 		if (!Inventory.contains(id)) return;
 		clearAttacker();
 		NPC zooknock = QuestWorkflow.npc(7170);
-		QuestWorkflow.require(zooknock != null && Inventory.get(id).useOn(zooknock),"Zooknock item delivery failed: " + id);
+		WorkflowScript.require(zooknock != null && Inventory.get(id).useOn(zooknock),"Zooknock item delivery failed: " + id);
 		quest.dialogue(() -> !Inventory.contains(id),40);
 	}
 	void exit()
@@ -61,8 +61,8 @@ final class MonkeyDungeon
 		int id = SnapshotData.integer(attacker,"id");
 		int index = SnapshotData.integer(attacker,"index");
 		NPC target = org.dreambot.api.methods.interactive.NPCs.closest(npc -> npc.getId() == id && npc.getIndex() == index);
-		QuestWorkflow.require(target != null && target.interact("Attack"),"Dungeon attacker could not be cleared");
-		QuestWorkflow.await(() -> org.dreambot.api.methods.interactive.NPCs.closest(npc -> npc.getId() == id && npc.getIndex() == index && !npc.isDead()) == null,
+		WorkflowScript.require(target != null && target.interact("Attack"),"Dungeon attacker could not be cleared");
+		WorkflowScript.awaitTicks(() -> org.dreambot.api.methods.interactive.NPCs.closest(npc -> npc.getId() == id && npc.getIndex() == index && !npc.isDead()) == null,
 			60,"Dungeon attacker did not clear");
 	}
 }

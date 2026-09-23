@@ -3,11 +3,13 @@ package com.genericclient.scripts.quests;
 import com.genericclient.script.Automation;
 import com.genericclient.scripts.shared.Jewellery;
 import com.genericclient.scripts.shared.Supplies;
+import com.genericclient.scripts.shared.WorkflowScript;
 import org.dreambot.api.methods.container.impl.Inventory;
 import org.dreambot.api.methods.interactive.GameObjects;
 import org.dreambot.api.methods.map.Tile;
 import org.dreambot.api.methods.widget.Widgets;
 import org.dreambot.api.wrappers.interactive.GameObject;
+import org.dreambot.api.wrappers.items.Item;
 
 final class WaterfallNavigation
 {
@@ -34,9 +36,9 @@ final class WaterfallNavigation
 			case "read_book":
 				Automation.intent("waterfall.read_book", () ->
 				{
-					QuestWorkflow.require(Inventory.interact(292,"Read"),"Waterfall book did not open");
+					WorkflowScript.require(Inventory.interact(292,"Read"),"Waterfall book did not open");
 					quest.dialogue(() -> quest.stage() >= 3,30);
-					QuestWorkflow.require(Widgets.closeAll(),"Waterfall book did not close");
+					WorkflowScript.require(Widgets.closeAll(),"Waterfall book did not close");
 					return null;
 				}); break;
 			case "downstairs": quest.walk(TOURIST_GROUND,0,false); break;
@@ -44,8 +46,8 @@ final class WaterfallNavigation
 			case "golrie_key": quest.interact(1990,"Search",new Tile(2548,9565),() -> Inventory.contains(293),true); break;
 			case "golrie_gate": openGolrieGate(); break;
 			case "pebble": quest.talk(new int[]{4183},new Tile(2514,9580),() -> Inventory.contains(294),true); break;
-			case "leave_gnome": leave(Jewellery.Destination.CASTLE_WARS,GNOME_SURFACE); break;
-			case "leave_tomb": leave(Jewellery.Destination.BARBARIAN_OUTPOST,TOMB_SURFACE); break;
+			case "leave_gnome": quest.leave(Jewellery.Destination.CASTLE_WARS,GNOME_SURFACE); break;
+			case "leave_tomb": quest.leave(Jewellery.Destination.BARBARIAN_OUTPOST,TOMB_SURFACE); break;
 			case "equip_amulet": Supplies.equip(295); break;
 			case "enter_falls": quest.interact(2010,"Open",new Tile(2511,3464),() -> Waterfall.FALLS.contains(QuestWorkflow.tile()),true); break;
 			default: throw new IllegalArgumentException("Unknown Waterfall navigation phase: " + phase);
@@ -60,34 +62,20 @@ final class WaterfallNavigation
 	private void useRope(int id, Tile point, org.dreambot.api.methods.map.Area arrival)
 	{
 		GameObject target = QuestWorkflow.object(id,point);
-		QuestWorkflow.require(target != null && Inventory.get(954).useOn(target),"Rope crossing failed");
-		QuestWorkflow.await(() -> arrival.contains(QuestWorkflow.tile()),30,"Rope crossing arrival was not observed");
+		Item rope = Inventory.get(954);
+		WorkflowScript.require(target != null && rope != null && rope.useOn(target),"Rope crossing failed");
+		WorkflowScript.awaitTicks(() -> arrival.contains(QuestWorkflow.tile()),30,"Rope crossing arrival was not observed");
 	}
 	private void gnomeDungeon()
 	{
 		if (GNOME_SURFACE.distance() > 150) Jewellery.teleport(Jewellery.Destination.CASTLE_WARS);
 		quest.walk(GNOME_BASEMENT,1,true);
 	}
-	private void leave(Jewellery.Destination destination, Tile surface)
-	{
-		IllegalStateException teleportFailure = null;
-		if (Jewellery.carried(destination))
-		{
-			try { Jewellery.teleport(destination); return; }
-			catch (IllegalStateException failure) { teleportFailure = failure; }
-		}
-		try { quest.walk(surface,1,true); }
-		catch (IllegalStateException failure)
-		{
-			if (teleportFailure != null) failure.addSuppressed(teleportFailure);
-			throw failure;
-		}
-	}
 	private void openGolrieGate()
 	{
 		quest.walk(new Tile(2515,9575),3,true);
 		GameObject gate = GameObjects.closest(1991);
-		QuestWorkflow.require(gate != null && gate.interact("Open"),"Golrie's gate did not open");
+		WorkflowScript.require(gate != null && gate.interact("Open"),"Golrie's gate did not open");
 		quest.walk(new Tile(2514,9580),0,true);
 	}
 }

@@ -12,7 +12,6 @@ final class MonkeyAreas
 	static final Area JUNGLE_DEMON_ROOM_PLATFORM = new Area(2671,9151,2749,9214,1);
 	static final Area JUNGLE_DEMON_ROOM_GROUND = new Area(2671,9151,2749,9214,0);
 	static final Area CRASH_ISLAND = new Area(2883,2693,2941,2747,0);
-	static final Area TEMPLE_MELEE_THRESHOLD = new Area(2787,2784,2787,2789,0);
 	static final Area THRONE_ROOM = new Area(2800,2759,2805,2766,0);
 	static final Area APE_ATOLL_SOUTH_CORRIDOR_NARROW = new Area(2718,2744,2726,2765,0);
 	static final Area TEMPLE_DUNGEON = new Area(2777,9185,2818,9219,0);
@@ -39,7 +38,6 @@ final class MonkeyAreas
 	static final Area POST_PUZZLE_HANGAR = new Area(2620,4480,2680,4540,0);
 	static final Area THRONE_ROOM_WEST = new Area(2796,2763,2798,2765,0);
 	static final Area APE_ATOLL_NORTH = new Area(2682,2766,2816,2817,0);
-	static final Area HANGAR = new Area(2360,9860,2420,9910,0);
 	static boolean south() { return in(APE_ATOLL_SOUTH,APE_ATOLL_SOUTH_CORRIDOR_WIDE,APE_ATOLL_SOUTH_CORRIDOR_NARROW); }
 	static boolean north() { return in(APE_ATOLL_NORTH,APE_ATOLL_NORTH_WEST,APE_ATOLL_NORTH_EAST); }
 	static boolean prison()

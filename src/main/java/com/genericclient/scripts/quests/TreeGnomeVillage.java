@@ -1,8 +1,12 @@
 package com.genericclient.scripts.quests;
 
+import static com.genericclient.scripts.shared.WorkflowScript.awaitTicks;
+import static com.genericclient.scripts.shared.WorkflowScript.require;
+
 import org.dreambot.api.methods.settings.PlayerSettings;
 import com.genericclient.scripts.shared.WorkflowScript;
 import com.genericclient.script.Automation;
+import com.genericclient.script.ScriptScope;
 import com.genericclient.script.SnapshotData;
 import com.genericclient.scripts.shared.Jewellery;
 import com.genericclient.scripts.shared.Supply;
@@ -24,6 +28,7 @@ final class TreeGnomeVillage extends QuestWorkflow
 {
 	private static final Area VILLAGE = new Area(2514,3158,2542,3175);
 	private static final Area TOWER = new Area(2500,3251,2508,3260);
+	private static final Tile OUTSIDE_VILLAGE = new Tile(2505,3190);
 	private boolean prepared;
 	TreeGnomeVillage() { super("tree_gnome_village"); }
 	@Override int stage() { return PlayerSettings.getConfig(111); }
@@ -95,7 +100,7 @@ final class TreeGnomeVillage extends QuestWorkflow
 	private void prepareStock()
 	{
 		List<Supply> stock = new ArrayList<>(List.of(new Supply(1381,"Staff of air",1,2000),
-			new Supply(562,"Chaos rune",100,500),new Supply(557,"Earth rune",300,100),duelingRing(),
+			new Supply(562,"Chaos rune",100,500),new Supply(557,"Earth rune",300,100),Jewellery.DUELING_RING,
 			new Supply(379,"Lobster",stage() < 3 ? 14 : 20,500)));
 		if (stage() < 3) stock.add(new Supply(1511,"Logs",6,500));
 		prepare(stock); prepared = true;
@@ -104,7 +109,7 @@ final class TreeGnomeVillage extends QuestWorkflow
 	private void enterVillage(boolean maze)
 	{
 		if (VILLAGE.contains(tile())) return;
-		if (new Tile(2505,3190).distance() > 150) Jewellery.teleport(Jewellery.Destination.CASTLE_WARS);
+		if (OUTSIDE_VILLAGE.distance() > 150) Jewellery.teleport(Jewellery.Destination.CASTLE_WARS);
 		if (maze) walk(new Tile(2515,3159),0,false);
 		else talk(new int[]{4968},new Tile(2505,3191),() -> VILLAGE.contains(tile()),false,"Yes please.");
 		require(VILLAGE.contains(tile()),"Gnome village arrival was not observed");
@@ -112,7 +117,7 @@ final class TreeGnomeVillage extends QuestWorkflow
 	private void leaveVillage()
 	{
 		if (!VILLAGE.contains(tile())) return;
-		walk(new Tile(2505,3190),0,false);
+		walk(OUTSIDE_VILLAGE,0,false);
 	}
 	private void montai(int stage, String... choices)
 	{
@@ -126,9 +131,9 @@ final class TreeGnomeVillage extends QuestWorkflow
 		{
 			GameObject ballista = GameObjects.closest(2181);
 			require(ballista != null && ballista.interact("Fire"),"Ballista could not be fired");
-			dialogue(() -> stage() >= 5,100,String.format(java.util.Locale.ROOT,"%04d",bit(602)+1));			return null;
+			dialogue(() -> stage() >= 5,100,String.format(java.util.Locale.ROOT,"%04d",bit(602)+1));
+			return null;
 		});
-
 	}
 	private void enterTower()
 	{
@@ -141,9 +146,9 @@ final class TreeGnomeVillage extends QuestWorkflow
 		{
 			GameObject ladder = GameObjects.closest(object -> object.getId() == 16683 && object.hasAction("Climb-up"));
 			require(ladder != null && ladder.interact("Climb-up"),"Orb tower ladder was not available");
-			await(() -> tile().getZ() == 1,40,"Orb tower ascent was not observed");			return null;
+			awaitTicks(() -> tile().getZ() == 1,40,"Orb tower ascent was not observed");
+			return null;
 		});
-
 	}
 	private void searchChest()
 	{
@@ -153,12 +158,13 @@ final class TreeGnomeVillage extends QuestWorkflow
 			if (closed != null)
 			{
 				require(closed.interact("Open"),"Orb chest did not open");
-				await(() -> GameObjects.closest(2182) != null,30,"Open orb chest was not observed");
+				awaitTicks(() -> GameObjects.closest(2182) != null,30,"Open orb chest was not observed");
 			}
-			require(GameObjects.closest(2182).interact("Search"),"Orb chest search failed");
-			await(() -> Inventory.contains(587),40,"First orb was not obtained");			return null;
+			GameObject open = GameObjects.closest(2182);
+			require(open != null && open.interact("Search"),"Orb chest search failed");
+			awaitTicks(() -> Inventory.contains(587),40,"First orb was not obtained");
+			return null;
 		});
-
 	}
 	private void leaveTower()
 	{
@@ -166,7 +172,7 @@ final class TreeGnomeVillage extends QuestWorkflow
 		{
 			GameObject ladder = GameObjects.closest(object -> object.getName().equals("Ladder") && object.hasAction("Climb-down"));
 			require(ladder != null && ladder.interact("Climb-down"),"Orb tower descent failed");
-			await(() -> tile().getZ() == 0,40,"Orb tower descent was not observed");
+			awaitTicks(() -> tile().getZ() == 0,40,"Orb tower descent was not observed");
 		}
 		if (TOWER.contains(tile()))
 		{
@@ -188,7 +194,7 @@ final class TreeGnomeVillage extends QuestWorkflow
 		}
 		catch (RuntimeException failure)
 		{
-			if (!(failure instanceof java.util.concurrent.CancellationException) && com.genericclient.script.ScriptScope.current().isRunning())
+			if (!(failure instanceof java.util.concurrent.CancellationException) && ScriptScope.current().isRunning())
 			{
 				try { escape(); }
 				catch (RuntimeException escapeFailure) { failure.addSuppressed(escapeFailure); }
@@ -199,9 +205,9 @@ final class TreeGnomeVillage extends QuestWorkflow
 	private void positionWarlord()
 	{
 		Travel.to(new Tile(2443,3303),1,"combat",WorkflowScript.NO_DISCRETIONARY);
-		await(() -> { NPC npc = npc(7622); return npc != null && npc.getTile().getX() <= 2448 && npc.distance() <= 5; },20,"Warlord pin was not observed");
+		awaitTicks(() -> { NPC npc = npc(7622); return npc != null && npc.getTile().getX() <= 2448 && npc.distance() <= 5; },20,"Warlord pin was not observed");
 		Travel.to(new Tile(2443,3296),1,"combat",WorkflowScript.NO_DISCRETIONARY);
-		await(() -> { NPC npc = npc(7622); return npc != null && npc.distance() >= 4 && QuestCombat.lineOfSight(npc); },10,"Warlord safespot was not established");
+		awaitTicks(() -> { NPC npc = npc(7622); return npc != null && npc.distance() >= 4 && QuestCombat.lineOfSight(npc); },10,"Warlord safespot was not established");
 	}
 	private Map<?,?> groundOrbs()
 	{
@@ -213,5 +219,5 @@ final class TreeGnomeVillage extends QuestWorkflow
 		Map<?,?> world = SnapshotData.map(drop.get("world"));
 		take(588,new Tile(SnapshotData.integer(world,"x"),SnapshotData.integer(world,"y"),SnapshotData.integer(world,"plane")));
 	}
-	@Override void escape() { Jewellery.teleport(Jewellery.Destination.CASTLE_WARS); }
+	@Override void escape() { leave(Jewellery.Destination.CASTLE_WARS,OUTSIDE_VILLAGE); }
 }

@@ -138,23 +138,26 @@ public class RomeoAndJulietTest
     {
         QuestScenario game = new QuestScenario("romeo__juliet",144,10,new Tile(3158,3427,1));
         game.npc(5035,"Juliet",new Tile(3158,3425,1),"Talk-to");
+        game.npcs.get(0).put("line_of_sight",false);
         game.input = (type,args) ->
         {
             if (type.equals("walk.to"))
             {
                 assertEquals(0,args.get("within"));
-                assertEquals(Map.of("x",3158,"y",3425,"plane",1),args.get("destination"));
-                game.position = new Tile(3158,3425,1);
+                assertEquals(Map.of("x",3158,"y",3426,"plane",1),args.get("destination"));
+                game.position = new Tile(3158,3426,1);
+                game.npcs.get(0).put("line_of_sight",true);
             }
             else
             {
                 assertEquals("npc.interact",type);
-                assertEquals("The room door must be traversed before talking",new Tile(3158,3425,1),game.position);
+                assertEquals("The room door must be traversed before talking",new Tile(3158,3426,1),game.position);
                 game.transitions.add(() -> { game.inventory.put(755,1); game.stage = 20; });
             }
         };
         game.run();
         assertEquals(Map.of("status","checkpoint","quest","romeo__juliet","stage",20),game.result);
+        assertEquals(1,game.actions.stream().filter("walk.to"::equals).count());
     }
 
     @Test public void completesTheQuestAcrossBothVisitsUpstairsAndThePotionConversation()
@@ -243,6 +246,5 @@ public class RomeoAndJulietTest
         game.run();
         assertEquals(Map.of("status","checkpoint","quest","romeo__juliet","stage",10),game.result);
         assertEquals(10,game.stage);
-        assertNull(game.intents.current);
     }
 }

@@ -78,6 +78,20 @@ public class MagicCombatContractsTest
 		assertEquals(5, account.attackedIndexes.size());
 	}
 
+	@Test public void aFailedDisengageWalkDoesNotHideTheTrainingFailure()
+	{
+		CombatScenario account = new CombatScenario(100);
+		account.castDelay = 20;
+		account.disengageFails = true;
+		try { account.run(); fail("Unconfirmed casting must stop"); }
+		catch (IllegalStateException expected)
+		{
+			assertEquals("Combat casts did not produce Magic XP", expected.getMessage());
+			assertEquals(1, expected.getSuppressed().length);
+			assertTrue(expected.getSuppressed()[0].getMessage().startsWith("Travel did not reach"));
+		}
+	}
+
 	@Test public void manualCancellationPreventsFurtherScriptInput()
 	{
 		CombatScenario account = new CombatScenario(100);
@@ -161,6 +175,7 @@ public class MagicCombatContractsTest
 		private long stopAtTick = -1;
 		private int cancelDelay = -1;
 		private int rejectAttacks;
+		private boolean disengageFails;
 		private final List<Integer> attackedIndexes = new ArrayList<>();
 		private long targetAvailableTick;
 		private List<Map<String,Object>> npcs = List.of(Map.of("identity",3L,"id",266,"index",2,"name","Pirate",
@@ -197,8 +212,11 @@ public class MagicCombatContractsTest
 			if (type.equals("safety.configure")) return Map.of("status","complete");
 			if (type.equals("walk.to"))
 			{
-				position = (Map<?,?>) arguments.get("destination");
-				if (position.get("x").equals(3012) && position.get("y").equals(3190))
+				Map<?,?> destination = (Map<?,?>) arguments.get("destination");
+				boolean disengage = destination.get("x").equals(3012) && destination.get("y").equals(3190);
+				if (disengage && disengageFails) return Map.of("status","failed");
+				position = destination;
+				if (disengage)
 				{
 					xpAtDisengage = experience.get(Skill.MAGIC) - initialXp;
 					attackTick = -1;

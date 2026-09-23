@@ -1,5 +1,8 @@
 package com.genericclient.scripts.quests;
 
+import static com.genericclient.scripts.shared.WorkflowScript.awaitTicks;
+import static com.genericclient.scripts.shared.WorkflowScript.require;
+
 import org.dreambot.api.methods.settings.PlayerSettings;
 import com.genericclient.scripts.shared.WorkflowScript;
 import com.genericclient.script.Automation;
@@ -29,6 +32,7 @@ final class FightArena extends QuestWorkflow
 	private static final int[] SAMMY = {12031,12033,12030,1204};
 	private static final Area ARENA = new Area(2583,3152,2606,3170);
 	private static final Area CELL = new Area(2597,3142,2601,3144);
+	private static final Tile LADY_TILE = new Tile(2565,3199);
 	private boolean prepared;
 	FightArena() { super("fight_arena"); }
 	@Override int stage() { return PlayerSettings.getConfig(17); }
@@ -54,7 +58,6 @@ final class FightArena extends QuestWorkflow
 			case 2:return "guard";
 			case 3:return Inventory.contains(77) ? "give_brew" : "buy_brew";
 			case 4:case 5:return Inventory.contains(76) ? "free_sammy" : "keys";
-
 			default:throw new IllegalStateException("Unexpected Fight Arena stage: " + stage);
 		}
 	}
@@ -83,7 +86,7 @@ final class FightArena extends QuestWorkflow
 		switch (phase)
 		{
 			case "prepare": prepareStock(); break;
-			case "accept": talk(LADY,new Tile(2565,3199),() -> stage() > 0,false,"Yes."); break;
+			case "accept": talk(LADY,LADY_TILE,() -> stage() > 0,false,"Yes."); break;
 			case "armour": armour(); break;
 			case "equip_armour":
 				Automation.intent("fight_arena.equip_armour", () ->
@@ -104,7 +107,7 @@ final class FightArena extends QuestWorkflow
 			case "scorpion": fight(1226,10,true); break;
 			case "bouncer": fight(1224,11,false); break;
 			case "exit": exitArena(); break;
-			case "finish": talk(LADY,new Tile(2565,3199),this::finished,false); break;
+			case "finish": talk(LADY,LADY_TILE,this::finished,false); break;
 			default:throw new IllegalArgumentException("Unknown Fight Arena phase: " + phase);
 		}
 	}
@@ -112,7 +115,7 @@ final class FightArena extends QuestWorkflow
 	private void prepareStock()
 	{
 		List<Supply> stock = new ArrayList<>(List.of(new Supply(1381,"Staff of air",1,2000),new Supply(562,"Chaos rune",100,500),
-			new Supply(557,"Earth rune",300,100),duelingRing(),new Supply(995,"Coins",5,0),new Supply(379,"Lobster",18,500)));
+			new Supply(557,"Earth rune",300,100),Jewellery.DUELING_RING,new Supply(995,"Coins",5,0),new Supply(379,"Lobster",18,500)));
 		for (int id : new int[]{74,75,76,77}) if (carried(id) || Supplies.owned(id) > 0) stock.add(questItem(id,"Fight Arena item"));
 		prepare(stock); prepared = true;
 		Jewellery.teleport(Jewellery.Destination.CASTLE_WARS);
@@ -127,14 +130,14 @@ final class FightArena extends QuestWorkflow
 			{
 				GameObject closed = GameObjects.closest(75);
 				require(closed != null && closed.interact("Open"),"Khazard armour chest did not open");
-				await(() -> GameObjects.closest(object -> (object.getId() == 75 || object.getId() == 76) && object.hasAction("Search")) != null,
+				awaitTicks(() -> GameObjects.closest(object -> (object.getId() == 75 || object.getId() == 76) && object.hasAction("Search")) != null,
 					30,"Searchable armour chest was not observed");
 				chest = GameObjects.closest(object -> (object.getId() == 75 || object.getId() == 76) && object.hasAction("Search"));
 			}
 			require(chest.interact("Search"),"Khazard armour search failed");
-			await(() -> carried(74) && carried(75),40,"Khazard armour was not obtained");			return null;
+			awaitTicks(() -> carried(74) && carried(75),40,"Khazard armour was not obtained");
+			return null;
 		});
-
 	}
 	private void guard()
 	{
@@ -190,7 +193,7 @@ final class FightArena extends QuestWorkflow
 				exit = GameObjects.closest(object -> object.hasAction("Quick-escape"));
 			}
 			require(exit != null && exit.interact("Quick-escape"),"Arena quick escape was not available");
-			await(() -> tile().getX() < 10000,30,"Arena escape was not observed");
+			awaitTicks(() -> tile().getX() < 10000,30,"Arena escape was not observed");
 		}
 		else
 		{
@@ -200,5 +203,5 @@ final class FightArena extends QuestWorkflow
 			dialogue(() -> !ARENA.contains(tile()),80,"Yes.");
 		}
 	}
-	@Override void escape() { if (tile().getX() >= 10000) exitArena(); else Jewellery.teleport(Jewellery.Destination.CASTLE_WARS); }
+	@Override void escape() { if (tile().getX() >= 10000) exitArena(); else leave(Jewellery.Destination.CASTLE_WARS,LADY_TILE); }
 }

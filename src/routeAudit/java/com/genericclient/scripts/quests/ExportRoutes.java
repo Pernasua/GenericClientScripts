@@ -48,10 +48,6 @@ public final class ExportRoutes
             route(writer,"grand_tree.stronghold",new Tile(2440,3089),new Journey(GnomeTravel.KING_TILE,2),"ALL");
             route(writer,"grand_tree.hazelmere",new Tile(2440,3089),new Journey(GnomeTravel.HAZELMERE,1),"ALL");
             transports(writer);
-            Field[] points=MonkeyMap.class.getDeclaredFields();
-            Arrays.sort(points,Comparator.comparing(Field::getName));
-            for (Field field : points)
-                if (field.getType()==Tile.class) row(writer,"monkey_madness_i."+field.getName().toLowerCase(Locale.ROOT),1,(Tile)field.get(null),0,"point","ALL");
         }
         System.out.println("Exported Java catalog journeys to " + output);
     }
@@ -120,11 +116,10 @@ public final class ExportRoutes
 
     private static void rows(BufferedWriter writer, String name, List<Tile> tiles, int within, String kind, String account) throws IOException
     {
-        for (int index=0; index<tiles.size(); index++) row(writer,name,index+1,tiles.get(index),within,kind,account);
-    }
-
-    private static void row(BufferedWriter writer, String name, int index, Tile tile, int within, String kind, String account) throws IOException
-    {
-        writer.write(String.format(Locale.ROOT,"%s\t%d\t%d\t%d\t%d\t%d\t%s\t%s%n",name,index,tile.getX(),tile.getY(),tile.getZ(),within,kind,account));
+        for (int index=0; index<tiles.size(); index++)
+        {
+            Tile tile=tiles.get(index);
+            writer.write(String.format(Locale.ROOT,"%s\t%d\t%d\t%d\t%d\t%d\t%s\t%s%n",name,index+1,tile.getX(),tile.getY(),tile.getZ(),within,kind,account));
+        }
     }
 }

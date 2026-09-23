@@ -17,5 +17,4 @@ after the experiment, before returning the ball. Completion scope proceeds throu
 the verified fight and reward dialogue.
 
 A phase advances only after its inventory, position, dialogue, or quest-variable
-postcondition is observed. The checkpoint regression is covered by a scenario
-test; full live completion of the Java workflow is a separate acceptance step.
+postcondition is observed. A scenario test covers the checkpoint regression.

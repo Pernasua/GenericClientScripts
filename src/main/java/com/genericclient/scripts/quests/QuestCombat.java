@@ -3,10 +3,10 @@ package com.genericclient.scripts.quests;
 import com.genericclient.scripts.shared.Conversations;
 import com.genericclient.script.Automation;
 import com.genericclient.script.SnapshotData;
+import com.genericclient.scripts.shared.Safety;
 import com.genericclient.scripts.shared.Supplies;
 import com.genericclient.scripts.shared.WorkflowScript;
 import java.util.Map;
-import java.util.List;
 import java.util.function.Consumer;
 import org.dreambot.api.methods.dialogues.Dialogues;
 import org.dreambot.api.methods.magic.Magic;
@@ -22,15 +22,12 @@ final class QuestCombat
 	{
 		Automation.activity("combat",WorkflowScript.NO_DISCRETIONARY);
 		Supplies.equip(staff);
-		QuestWorkflow.require(Magic.setAutocastSpell(spell),"Quest autocast could not be configured");
+		WorkflowScript.require(Magic.setAutocastSpell(spell),"Quest autocast could not be configured");
 	}
 	static void foodGuard(int minimumHitpoints)
 	{
-		QuestWorkflow.require(SnapshotData.action("client.behaviors.configure",Map.of("auto_retaliate",false,"emergency_escape",true)),
-			"Quest combat behavior could not be configured");
-		QuestWorkflow.require(SnapshotData.action("safety.configure",Map.of("minimum_hitpoints",minimumHitpoints,
-			"consumables",List.of(Map.of("id",379,"action","Eat","heal_amount",12)),"continue_after_consumable",true,"allow_overheal",false)),
-			"Quest combat food guard could not be configured");
+		Safety.behaviors(false,true,true);
+		Safety.guard(minimumHitpoints,Safety.lobster(),false,null);
 	}
 
 	static boolean lineOfSight(NPC npc)
@@ -49,7 +46,7 @@ final class QuestCombat
 			NPC npc = QuestWorkflow.npc(ids);
 			if (npc == null || npc.isDead())
 			{
-				QuestWorkflow.require(++missing < 45,"Combat target disappeared without its completion state");
+				WorkflowScript.require(++missing < 45,"Combat target disappeared without its completion state");
 			}
 			else
 			{
@@ -57,7 +54,7 @@ final class QuestCombat
 				maintainPosition.accept(npc);
 				if (reattack || !WorkflowScript.player().isInCombat())
 				{
-					QuestWorkflow.require(npc.interact("Attack"),"Quest attack failed");
+					WorkflowScript.require(npc.interact("Attack"),"Quest attack failed");
 					reattack = false;
 				}
 			}

@@ -3,6 +3,7 @@ package com.genericclient.scripts.quests;
 import com.genericclient.scripts.shared.Conversations;
 import com.genericclient.script.Automation;
 import com.genericclient.script.SnapshotData;
+import com.genericclient.scripts.shared.WorkflowScript;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -52,7 +53,7 @@ final class MonkeyPrelude
 		Automation.intent("monkey_madness.enter_shipyard", () ->
 		{
 			GameObject gate = GameObjects.closest(2438);
-			QuestWorkflow.require(gate != null && gate.interact("Open"),"Shipyard gate did not open");
+			WorkflowScript.require(gate != null && gate.interact("Open"),"Shipyard gate did not open");
 			Sleep.sleepTicks(2);
 			com.genericclient.scripts.shared.Conversations.finish();
 			quest.walk(MonkeyMap.SHIPYARD_GATE_INSIDE,0,false);
@@ -78,16 +79,16 @@ final class MonkeyPrelude
 				{
 					List<?> options = (List<?>)page.get("options");
 					String selection = hangarChoice(chosen,options);
-					QuestWorkflow.require(selection != null,"Unexpected Daero travel choices");
+					WorkflowScript.require(selection != null,"Unexpected Daero travel choices");
 					String applied = Conversations.choose(options,selection);
 					if (applied != null) chosen.add(applied);
 					closed = 0;
 				}
 				else if (++closed >= 3)
 				{
-					QuestWorkflow.require(++conversations <= 4,"Daero conversation limit reached");
+					WorkflowScript.require(++conversations <= 4,"Daero conversation limit reached");
 					NPC daero = QuestWorkflow.npc(MonkeyTravel.DAERO);
-					QuestWorkflow.require(daero != null && daero.interact("Talk-to"),"Daero could not resume travel dialogue");
+					WorkflowScript.require(daero != null && daero.interact("Talk-to"),"Daero could not resume travel dialogue");
 					closed = 0;
 				}
 				Sleep.sleepTicks(1);
@@ -114,21 +115,21 @@ final class MonkeyPrelude
 		{
 			quest.walk(MonkeyMap.REINITIALIZATION_PANEL,3,false);
 			GameObject panel = GameObjects.closest(4871);
-			QuestWorkflow.require(panel != null && panel.interact("Operate"),"Reinitialization panel did not open");
-			QuestWorkflow.await(() -> Boolean.TRUE.equals(SnapshotData.read("sliding_puzzle").get("available")),20,"Sliding puzzle was not observed");
+			WorkflowScript.require(panel != null && panel.interact("Operate"),"Reinitialization panel did not open");
+			WorkflowScript.awaitTicks(() -> Boolean.TRUE.equals(SnapshotData.read("sliding_puzzle").get("available")),20,"Sliding puzzle was not observed");
 			puzzle = SnapshotData.read("sliding_puzzle");
 		}
 		List<?> moves = (List<?>)puzzle.get("moves");
-		QuestWorkflow.require(((List<?>)puzzle.get("board")).size() == 25 && moves.size() <= 400,"Sliding puzzle state is invalid");
+		WorkflowScript.require(((List<?>)puzzle.get("board")).size() == 25 && moves.size() <= 400,"Sliding puzzle state is invalid");
 		int widget = SnapshotData.integer(puzzle,"widget_id");
 		for (Object move : moves)
 		{
 			int position = ((Number)move).intValue();
-			QuestWorkflow.require(SnapshotData.action("ui.click",Map.of("widget_id",widget,"widget_index",position)),"Sliding puzzle click failed");
-			QuestWorkflow.await(() -> quest.bit(123) >= 6 || blank() == position,10,"Sliding puzzle move was not observed");
+			WorkflowScript.require(SnapshotData.action("ui.click",Map.of("widget_id",widget,"widget_index",position)),"Sliding puzzle click failed");
+			WorkflowScript.awaitTicks(() -> quest.bit(123) >= 6 || blank() == position,10,"Sliding puzzle move was not observed");
 			if (quest.bit(123) >= 6) return;
 		}
-		QuestWorkflow.await(() -> quest.bit(123) >= 6,40,"Reinitialization completion was not observed");
+		WorkflowScript.awaitTicks(() -> quest.bit(123) >= 6,40,"Reinitialization completion was not observed");
 	}
 	private int blank()
 	{
