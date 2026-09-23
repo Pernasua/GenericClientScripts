@@ -1,5 +1,6 @@
 package com.genericclient.scripts.events;
 
+import com.genericclient.scripts.shared.Conversations;
 import com.genericclient.script.ScriptSettings;
 import com.genericclient.scripts.shared.WorkflowScript;
 import java.util.Map;
@@ -31,7 +32,7 @@ public final class CaptArnav extends WorkflowScript
 		for (int tick = 0; tick < 30; tick++)
 		{
 			if (EventSupport.message(started,"your reward") || EventSupport.message(started,"successfully")) return Map.of("status","solved");
-			EventSupport.dialogue();
+			Conversations.advance();
 			Sleep.sleepTicks(1);
 		}
 		throw new IllegalStateException("Chest reward was not observed");

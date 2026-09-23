@@ -57,7 +57,7 @@ public final class Molly extends WorkflowScript
 			require(actor != null && actor.interact("Talk-to"),"Molly's reward dialogue failed");
 			for (int tick = 0; tick < 120; tick++)
 			{
-				EventSupport.dialogue();
+				Conversations.advance();
 				Sleep.sleepTicks(1);
 				if (player().getTile().getX() < 10000 && EventSupport.message(started,"your reward is:"))
 					return Map.of("status","solved","twin_id",twin,"control_steps",steps);

@@ -37,8 +37,13 @@ final class MonkeyFavor
 			QuestWorkflow.require(minder != null && minder.interact("Talk-to"),"Zoo minder dialogue failed");
 			for (int tick = 0; tick < 160 && !MonkeyAreas.pen(); tick++)
 			{
-				if (Dialogues.canContinue()) QuestWorkflow.require(Dialogues.continueDialogue(),"Zoo dialogue failed");
-				else if (Dialogues.getOptions().length > 0) QuestWorkflow.require(Dialogues.chooseOption(1),"Zoo entry choice failed");
+				Map<?,?> page = SnapshotData.read("dialogue");
+				if ("continue".equals(page.get("type"))) Conversations.continuePage();
+				else
+				{
+					java.util.List<?> options = (java.util.List<?>)page.get("options");
+					if (!options.isEmpty()) Conversations.choose(options,(String)((Map<?,?>)options.get(0)).get("text"));
+				}
 				Sleep.sleepTicks(1);
 			}
 			QuestWorkflow.require(MonkeyAreas.pen(),"Monkey pen entry was not observed");

@@ -1,14 +1,13 @@
 package com.genericclient.scripts.quests;
 
+import com.genericclient.scripts.shared.Conversations;
 import com.genericclient.script.Automation;
 import com.genericclient.script.SnapshotData;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.dreambot.api.methods.container.impl.Inventory;
-import org.dreambot.api.methods.dialogues.Dialogues;
 import org.dreambot.api.methods.interactive.GameObjects;
 import org.dreambot.api.methods.widget.Widgets;
 import org.dreambot.api.utilities.Sleep;
@@ -28,7 +27,7 @@ final class MonkeyPrelude
 				travel.king();
 				Automation.intent("monkey_madness.start_quest", () ->
 				{
-					quest.talk(GnomeTravel.KING,null,() -> quest.varp() >= 1 && Inventory.contains(4004),false,"Yes.","Yes");
+					quest.talk(GnomeTravel.KING,null,() -> quest.stage() >= 1 && Inventory.contains(4004),false,"Yes.","Yes");
 					closeChapter();
 					return null;
 				}); break;
@@ -71,13 +70,18 @@ final class MonkeyPrelude
 			int closed = 0;
 			for (int tick = 0; tick < 240; tick++)
 			{
-				if (quest.bit(123) >= 5 && !Dialogues.inDialogue()) return null;
-				if (Dialogues.canContinue()) { QuestWorkflow.require(Dialogues.continueDialogue(),"Daero dialogue failed"); closed = 0; }
-				else if (Dialogues.inDialogue())
+				Map<?,?> page = SnapshotData.read("dialogue");
+				boolean open = Boolean.TRUE.equals(page.get("open"));
+				if (quest.bit(123) >= 5 && !open) return null;
+				if ("continue".equals(page.get("type"))) { Conversations.continuePage(); closed = 0; }
+				else if (open)
 				{
-					String selection = hangarChoice(chosen);
-					QuestWorkflow.require(selection != null && Dialogues.chooseOption(selection),"Unexpected Daero travel choices");
-					chosen.add(selection); closed = 0;
+					List<?> options = (List<?>)page.get("options");
+					String selection = hangarChoice(chosen,options);
+					QuestWorkflow.require(selection != null,"Unexpected Daero travel choices");
+					String applied = Conversations.choose(options,selection);
+					if (applied != null) chosen.add(applied);
+					closed = 0;
 				}
 				else if (++closed >= 3)
 				{
@@ -88,16 +92,17 @@ final class MonkeyPrelude
 				}
 				Sleep.sleepTicks(1);
 			}
-			throw new IllegalStateException("Daero did not start reinitialization");		});
-
+			throw new IllegalStateException("Daero did not start reinitialization");
+		});
 	}
-	private String hangarChoice(Set<String> chosen)
+	private String hangarChoice(Set<String> chosen, List<?> capturedOptions)
 	{
 		List<String> priority = quest.bit(123) <= 2 ? List.of("Talk about the 10th squad...","Who is it?","Yes","Leave...") :
 			quest.bit(123) == 3 ? List.of("How will I travel?","Are you coming with me?","Who is Garkor?","Who is it?",
 				"Talk about the 10th squad...","Talk about Caranock...","Talk about the journey...","Yes","Leave...") :
 			List.of("Yes","Who is it?","Leave...");
-		List<String> options = Arrays.asList(Dialogues.getOptions());
+		List<String> options = capturedOptions.stream().map(value -> (String)((Map<?,?>)value).get("text"))
+			.collect(java.util.stream.Collectors.toList());
 		return priority.stream().filter(value -> !chosen.contains(value) && options.contains(value)).findFirst()
 			.orElse(options.contains("Return to previous menu") ? "Return to previous menu" : options.contains("Leave...") ? "Leave..." : null);
 	}

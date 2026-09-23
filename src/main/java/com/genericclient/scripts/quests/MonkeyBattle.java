@@ -21,14 +21,14 @@ final class MonkeyBattle
 	}
 	void fight()
 	{
-		if (quest.varp() >= 6) return;
+		if (quest.stage() >= 6) return;
 		configure();
 		QuestWorkflow.require(MonkeyAreas.demon(),"Jungle demon room has not been reached");
 		Conversations.finish();
 		QuestWorkflow.await(() -> QuestWorkflow.npc(1443) != null,80,"Jungle demon did not appear");
 		NPC demon = QuestWorkflow.npc(1443);
 		QuestWorkflow.require(demon.distance() >= 3 && demon.distance() <= 10 && QuestCombat.lineOfSight(demon),"Jungle demon spawn position is unsafe");
-		QuestCombat.monitor(new int[]{1443},() -> quest.varp() >= 6,1400,target ->
+		QuestCombat.monitor(new int[]{1443},() -> quest.stage() >= 6,1400,target ->
 		{
 			QuestWorkflow.require(target.distance() >= 3,"Jungle demon entered melee range");
 			if (com.genericclient.script.ScriptScope.current().tick() % 10 == 0) MonkeySurvival.protection("magic",true,12);

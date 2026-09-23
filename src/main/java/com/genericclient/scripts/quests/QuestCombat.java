@@ -1,5 +1,6 @@
 package com.genericclient.scripts.quests;
 
+import com.genericclient.scripts.shared.Conversations;
 import com.genericclient.script.Automation;
 import com.genericclient.script.SnapshotData;
 import com.genericclient.scripts.shared.Supplies;
@@ -44,7 +45,7 @@ final class QuestCombat
 		for (int tick = 0; tick < ticks; tick++)
 		{
 			if (complete.verify()) return;
-			if (Dialogues.canContinue()) { QuestWorkflow.require(Dialogues.continueDialogue(),"Combat dialogue failed"); reattack = true; }
+			if (Dialogues.canContinue()) { Conversations.continuePage(); reattack = true; }
 			NPC npc = QuestWorkflow.npc(ids);
 			if (npc == null || npc.isDead())
 			{

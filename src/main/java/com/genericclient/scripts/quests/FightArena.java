@@ -1,5 +1,6 @@
 package com.genericclient.scripts.quests;
 
+import org.dreambot.api.methods.settings.PlayerSettings;
 import com.genericclient.scripts.shared.WorkflowScript;
 import com.genericclient.script.Automation;
 import com.genericclient.scripts.shared.Jewellery;
@@ -29,11 +30,12 @@ final class FightArena extends QuestWorkflow
 	private static final Area ARENA = new Area(2583,3152,2606,3170);
 	private static final Area CELL = new Area(2597,3142,2601,3144);
 	private boolean prepared;
-	FightArena() { super("fight_arena",17); }
+	FightArena() { super("fight_arena"); }
+	@Override int stage() { return PlayerSettings.getConfig(17); }
 	@Override void validate() { require(Skills.getRealLevel(Skill.MAGIC) >= 29 && Skills.getRealLevel(Skill.HITPOINTS) >= 20,"Fight Arena requires Magic 29 and 20 Hitpoints for this route"); QuestCombat.foodGuard(6); }
 	@Override String phase()
 	{
-		int stage = varp();
+		int stage = stage();
 		if (stage == 0 && !prepared || (stage == 6 || stage == 9 || stage == 10) && tile().getX() < 10000 && !combatReady()) return "prepare";
 		return questPhase(stage);
 	}
@@ -73,7 +75,7 @@ final class FightArena extends QuestWorkflow
 	{
 		return List.of("accept","armour","equip_armour","guard","buy_brew","give_brew","keys","free_sammy",
 			"sammy_ogre","ogre","general","hengrad","sammy_scorpion","scorpion","sammy_bouncer","bouncer","exit","finish")
-			.indexOf(questPhase(varp()));
+			.indexOf(questPhase(stage()));
 	}
 
 	@Override void execute(String phase)
@@ -81,7 +83,7 @@ final class FightArena extends QuestWorkflow
 		switch (phase)
 		{
 			case "prepare": prepareStock(); break;
-			case "accept": talk(LADY,new Tile(2565,3199),() -> varp() > 0,false,"Yes."); break;
+			case "accept": talk(LADY,new Tile(2565,3199),() -> stage() > 0,false,"Yes."); break;
 			case "armour": armour(); break;
 			case "equip_armour":
 				Automation.intent("fight_arena.equip_armour", () ->
@@ -92,7 +94,7 @@ final class FightArena extends QuestWorkflow
 			case "guard": case "give_brew": guard(); break;
 			case "buy_brew": buyBrew(); break;
 			case "keys": talk(new int[]{1209},new Tile(2615,3143),() -> Inventory.contains(76),false); break;
-			case "free_sammy": use(76,80,new Tile(2617,3167),() -> varp() >= 6,true); break;
+			case "free_sammy": use(76,80,new Tile(2617,3167),() -> stage() >= 6,true); break;
 			case "sammy_ogre": sammy(1225); break;
 			case "sammy_scorpion": sammy(1226); break;
 			case "sammy_bouncer": sammy(1224); break;
@@ -136,8 +138,8 @@ final class FightArena extends QuestWorkflow
 	}
 	private void guard()
 	{
-		int before = varp();
-		talk(new int[]{1209},new Tile(2615,3143),() -> varp() != before,false);
+		int before = stage();
+		talk(new int[]{1209},new Tile(2615,3143),() -> stage() != before,false);
 	}
 	private void buyBrew()
 	{
@@ -163,9 +165,9 @@ final class FightArena extends QuestWorkflow
 	}
 	private void general()
 	{
-		int before = varp();
-		if (Dialogues.inDialogue()) dialogue(() -> varp() != before,160);
-		else talk(new int[]{3510},null,() -> varp() != before,true);
+		int before = stage();
+		if (Dialogues.inDialogue()) dialogue(() -> stage() != before,160);
+		else talk(new int[]{3510},null,() -> stage() != before,true);
 	}
 	private void fight(int id, int nextStage, boolean allowClose)
 	{
@@ -174,7 +176,7 @@ final class FightArena extends QuestWorkflow
 		Travel.to(safe,0,"combat",WorkflowScript.NO_DISCRETIONARY);
 		NPC target = npc(id);
 		require(target != null && QuestCombat.lineOfSight(target) && (allowClose || target.distance() >= 4),"Arena safespot was not established");
-		QuestCombat.monitor(new int[]{id},() -> varp() >= nextStage,700,
+		QuestCombat.monitor(new int[]{id},() -> stage() >= nextStage,700,
 			current -> require(tile().equals(safe),"Arena safespot was lost"));
 	}
 	private void exitArena()

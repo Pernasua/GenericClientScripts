@@ -10,6 +10,8 @@ work. Before final delivery, fetch both repositories, rebase any new main change
 resolve conflicts, and repeat the affected validation.
 
 Current checks include catalog workflow scenarios, PMD, and Java route export.
-The client route audit found all 17 exported journeys. No new catalog artifact has
-been installed or exercised on a live account during this migration; do not infer
-live quest or training completion from these checks.
+The client route audit found all 17 exported journeys. On 2026-09-05 the Java
+catalog was installed and completed Romeo & Juliet and Goblin Diplomacy live.
+Their stage sources, cutscene recovery, interactions, and supply handling are
+covered in `docs/free-quests.md`. Other quest and training workflows retain their
+separate acceptance requirements.

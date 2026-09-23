@@ -1,5 +1,6 @@
 package com.genericclient.scripts.events;
 
+import com.genericclient.scripts.shared.Conversations;
 import com.genericclient.script.Automation;
 import com.genericclient.script.ScriptSettings;
 import com.genericclient.scripts.shared.WorkflowScript;
@@ -42,7 +43,7 @@ public final class Certer extends WorkflowScript
 			{
 				if (!EventSupport.present() && EventSupport.message(started,"your reward is:"))
 					return Map.of("status","solved","model_id",model,"answer",expected);
-				EventSupport.dialogue();
+				Conversations.advance();
 				Sleep.sleepTicks(1);
 			}
 			throw new IllegalStateException("Certer reward was not observed");		});

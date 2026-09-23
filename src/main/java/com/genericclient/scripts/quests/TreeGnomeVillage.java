@@ -1,5 +1,6 @@
 package com.genericclient.scripts.quests;
 
+import org.dreambot.api.methods.settings.PlayerSettings;
 import com.genericclient.scripts.shared.WorkflowScript;
 import com.genericclient.script.Automation;
 import com.genericclient.script.SnapshotData;
@@ -24,11 +25,12 @@ final class TreeGnomeVillage extends QuestWorkflow
 	private static final Area VILLAGE = new Area(2514,3158,2542,3175);
 	private static final Area TOWER = new Area(2500,3251,2508,3260);
 	private boolean prepared;
-	TreeGnomeVillage() { super("tree_gnome_village",111); }
+	TreeGnomeVillage() { super("tree_gnome_village"); }
+	@Override int stage() { return PlayerSettings.getConfig(111); }
 	@Override void validate() { require(Skills.getRealLevel(Skill.MAGIC) >= 29 && Skills.getRealLevel(Skill.HITPOINTS) >= 20,"Tree Gnome Village requires Magic 29 and 20 Hitpoints for this route"); QuestCombat.foodGuard(Math.max(4,Skills.getRealLevel(Skill.HITPOINTS)/4)); }
 	@Override String phase()
 	{
-		int stage = varp();
+		int stage = stage();
 		if (stage == 0 && !prepared || stage == 2 && Inventory.count(1511) < 6 ||
 			stage == 7 && !carried(588) && groundOrbs() == null && !combatReady()) return "prepare";
 		return questPhase(stage);
@@ -50,7 +52,7 @@ final class TreeGnomeVillage extends QuestWorkflow
 	}
 	@Override int checkpoint()
 	{
-		switch (questPhase(varp()))
+		switch (questPhase(stage()))
 		{
 			case "accept":return 0;
 			case "montai":case "logs":case "montai_again":return 1;
@@ -68,7 +70,7 @@ final class TreeGnomeVillage extends QuestWorkflow
 		switch (phase)
 		{
 			case "prepare": prepareStock(); break;
-			case "accept": enterVillage(true); talk(new int[]{4963},new Tile(2541,3170),() -> varp() >= 1,false,"Can I help at all?","I would be glad to help.","Yes."); break;
+			case "accept": enterVillage(true); talk(new int[]{4963},new Tile(2541,3170),() -> stage() >= 1,false,"Can I help at all?","I would be glad to help.","Yes."); break;
 			case "montai": montai(2,"Ok, I'll gather some wood."); break;
 			case "logs": require(Inventory.count(1511) >= 6,"Six logs are not carried"); montai(3); break;
 			case "montai_again": montai(4,"I'll try my best."); break;
@@ -78,7 +80,7 @@ final class TreeGnomeVillage extends QuestWorkflow
 			case "ballista": fireBallista(); break;
 			case "tower": enterTower(); break;
 			case "chest": searchChest(); break;
-			case "return_first_orb": leaveTower(); enterVillage(false); talk(new int[]{4963},new Tile(2541,3170),() -> varp() >= 7,false,"I will find the warlord and bring back the orbs."); break;
+			case "return_first_orb": leaveTower(); enterVillage(false); talk(new int[]{4963},new Tile(2541,3170),() -> stage() >= 7,false,"I will find the warlord and bring back the orbs."); break;
 			case "warlord": fightWarlord(); break;
 			case "take_orbs": takeOrbs(); break;
 			case "return_orbs": enterVillage(false); talk(new int[]{4963},new Tile(2541,3170),this::finished,false); break;
@@ -94,8 +96,8 @@ final class TreeGnomeVillage extends QuestWorkflow
 	{
 		List<Supply> stock = new ArrayList<>(List.of(new Supply(1381,"Staff of air",1,2000),
 			new Supply(562,"Chaos rune",100,500),new Supply(557,"Earth rune",300,100),duelingRing(),
-			new Supply(379,"Lobster",varp() < 3 ? 14 : 20,500)));
-		if (varp() < 3) stock.add(new Supply(1511,"Logs",6,500));
+			new Supply(379,"Lobster",stage() < 3 ? 14 : 20,500)));
+		if (stage() < 3) stock.add(new Supply(1511,"Logs",6,500));
 		prepare(stock); prepared = true;
 		Jewellery.teleport(Jewellery.Destination.CASTLE_WARS);
 	}
@@ -115,7 +117,7 @@ final class TreeGnomeVillage extends QuestWorkflow
 	private void montai(int stage, String... choices)
 	{
 		leaveVillage();
-		talk(new int[]{4964},new Tile(2523,3208),() -> varp() >= stage,false,choices);
+		talk(new int[]{4964},new Tile(2523,3208),() -> stage() >= stage,false,choices);
 	}
 	private void fireBallista()
 	{
@@ -124,7 +126,7 @@ final class TreeGnomeVillage extends QuestWorkflow
 		{
 			GameObject ballista = GameObjects.closest(2181);
 			require(ballista != null && ballista.interact("Fire"),"Ballista could not be fired");
-			dialogue(() -> varp() >= 5,100,String.format(java.util.Locale.ROOT,"%04d",bit(602)+1));			return null;
+			dialogue(() -> stage() >= 5,100,String.format(java.util.Locale.ROOT,"%04d",bit(602)+1));			return null;
 		});
 
 	}

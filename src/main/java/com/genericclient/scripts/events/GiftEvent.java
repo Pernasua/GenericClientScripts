@@ -1,5 +1,6 @@
 package com.genericclient.scripts.events;
 
+import com.genericclient.scripts.shared.Conversations;
 import com.genericclient.script.Automation;
 import com.genericclient.scripts.shared.WorkflowScript;
 import java.util.Map;
@@ -17,7 +18,7 @@ abstract class GiftEvent extends WorkflowScript
 			boolean talked = false;
 			for (int step = 0; step < 80; step++)
 			{
-				if (Dialogues.inDialogue()) EventSupport.dialogue();
+				if (Dialogues.inDialogue()) Conversations.advance();
 				else if (!EventSupport.present() && reward.test(tick)) return Map.of("status","solved");
 				else if (!talked && EventSupport.present()) { EventSupport.talk(); talked = true; }
 				Sleep.sleepTicks(1);

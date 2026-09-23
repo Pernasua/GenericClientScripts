@@ -1,13 +1,12 @@
 package com.genericclient.scripts.quests;
 
+import com.genericclient.scripts.shared.Conversations;
 import com.genericclient.scripts.shared.WorkflowScript;
 import com.genericclient.script.Automation;
 import com.genericclient.script.Navigation;
 import com.genericclient.scripts.shared.Supplies;
-import java.util.Arrays;
 import java.util.Map;
 import org.dreambot.api.methods.container.impl.Inventory;
-import org.dreambot.api.methods.dialogues.Dialogues;
 import org.dreambot.api.methods.interactive.GameObjects;
 import org.dreambot.api.methods.map.Tile;
 import org.dreambot.api.utilities.Sleep;
@@ -80,13 +79,7 @@ final class MonkeyTalisman
 		for (int tick = 0; tick < 100; tick++)
 		{
 			if (Inventory.contains(4023) || auntNear()) return;
-			if (Dialogues.canContinue()) { opened = true; closed = 0; QuestWorkflow.require(Dialogues.continueDialogue(),"Monkey child dialogue did not continue"); }
-			else if (Dialogues.inDialogue())
-			{
-				opened = true; closed = 0;
-				String option = Arrays.stream(CHOICES).filter(choice -> Arrays.asList(Dialogues.getOptions()).contains(choice)).findFirst().orElse(null);
-				QuestWorkflow.require(option != null && Dialogues.chooseOption(option),"Unexpected monkey child dialogue");
-			}
+			if (Conversations.advance(CHOICES)) { opened = true; closed = 0; }
 			else if (opened && ++closed >= 3) return;
 			Sleep.sleepTicks(1);
 		}

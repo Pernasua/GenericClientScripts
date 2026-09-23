@@ -16,12 +16,25 @@ import org.dreambot.api.methods.map.Tile;
 public final class QuestScenario implements ScriptEnvironment
 {
 	final IntentTrace intents = new IntentTrace();
-	@Override public <T> T intent(String name, java.util.function.Supplier<T> body) { return intents.run(name,body); }
+	java.util.function.Consumer<String> enteringIntent = name -> {};
+	@Override public <T> T intent(String name, java.util.function.Supplier<T> body)
+	{
+		enteringIntent.accept(name);
+		return intents.run(name,body);
+	}
     final String quest;
     final int varpId;
     int stage;
+    int varpFlags;
     public Tile position;
     public final Map<Integer,Integer> inventory = new LinkedHashMap<>();
+    final Map<Integer,Integer> bank = new LinkedHashMap<>();
+    boolean bankOpen;
+    boolean bankKnown = true;
+    boolean instanced;
+    boolean sceneAvailable = true;
+    Map<String,String> overlayRows = Map.of();
+    java.util.function.Consumer<String> beforeRead = subject -> {};
     final Map<Integer,Integer> equipment = new LinkedHashMap<>();
     public final Map<Long,Integer> varbits = new LinkedHashMap<>();
     final List<Map<String,Object>> npcs = new ArrayList<>();
@@ -83,6 +96,7 @@ public final class QuestScenario implements ScriptEnvironment
 
     @Override public Object read(String subject, Map<String,Object> query)
     {
+        beforeRead.accept(subject);
         switch (subject)
         {
             case "local_player": return Map.of("identity",1L);
@@ -90,7 +104,7 @@ public final class QuestScenario implements ScriptEnvironment
             case "entity": return entity(query);
             case "inventory": return container(inventory);
             case "equipment": return container(equipment);
-            case "bank": return Map.of("available",true,"state","cached","open",false,"items",List.of(),"occupied_slots",0);
+            case "bank": return bankSnapshot();
             case "npcs": return npcs;
             case "objects": return objects;
             case "ground_items": return List.of();
@@ -101,17 +115,35 @@ public final class QuestScenario implements ScriptEnvironment
                 Map<String,Object> quests=new LinkedHashMap<>();
                 quests.put("the_grand_tree",Map.of("state","finished"));
                 quests.put("tree_gnome_village",Map.of("state","finished"));
-                quests.put(quest.equals("waterfall") ? "waterfall_quest" : quest,Map.of("state",finished ? "finished" : "in_progress"));
+                quests.put(quest.equals("waterfall") ? "waterfall_quest" : quest,Map.of("state",finished ? "finished" : "in_progress","progress",stage));
                 return quests;
             case "skills": return Map.of("available",true,"magic",Map.of("level",50,"boosted_level",50,"xp",101333),
                 "hitpoints",Map.of("level",40,"boosted_level",40,"xp",37224),"prayer",Map.of("level",43,"boosted_level",43,"xp",50339));
-            case "vars":
-                Map<Long,Integer> bits = new LinkedHashMap<>();
-                for (Object id : (List<?>)query.getOrDefault("varbits",List.of())) bits.put(((Number)id).longValue(),varbits.getOrDefault(((Number)id).longValue(),0));
-                return Map.of("available",true,"varps",Map.of((long)varpId,stage),"varbits",bits);
+            case "vars": return variables(query);
             case "runtime": return Map.of("game_tick",tick,"game_state","LOGGED_IN");
+            case "scene": return Map.of("available",sceneAvailable,"instance",instanced);
             default: throw new AssertionError("Unexpected quest read: " + subject);
         }
+    }
+
+    private Map<String,Object> bankSnapshot()
+    {
+        if (!bankKnown) return Map.of("available",false,"state","unknown","open",false,"items",List.of(),"occupied_slots",0);
+        Map<String,Object> snapshot = new LinkedHashMap<>(container(bank));
+        snapshot.put("state",bankOpen ? "open" : "cached");
+        snapshot.put("open",bankOpen);
+        return snapshot;
+    }
+
+    private Map<String,Object> variables(Map<String,Object> query)
+    {
+        Map<Long,Integer> bits = new LinkedHashMap<>();
+        for (Object value : (List<?>)query.getOrDefault("varbits",List.of()))
+        {
+            long id = ((Number)value).longValue();
+            bits.put(id,varbits.getOrDefault(id,0));
+        }
+        return Map.of("available",true,"varps",Map.of((long)varpId,stage | varpFlags),"varbits",bits);
     }
 
     private Map<String,Object> player()
@@ -179,6 +211,6 @@ public final class QuestScenario implements ScriptEnvironment
     }
     @Override public void activity(String name, Map<String,Object> policy) { activity=name; this.policy=policy; }
     @Override public void result(Object value) { result=value; }
-    @Override public void overlay(Map<String,String> rows) {}
+    @Override public void overlay(Map<String,String> rows) { overlayRows = rows; }
     @Override public void markers(List<Map<String,Object>> markers) {}
 }

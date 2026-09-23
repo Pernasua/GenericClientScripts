@@ -1,5 +1,6 @@
 package com.genericclient.scripts.quests;
 
+import org.dreambot.api.methods.settings.PlayerSettings;
 import com.genericclient.script.Automation;
 import com.genericclient.scripts.shared.Jewellery;
 import com.genericclient.scripts.shared.Supplies;
@@ -25,8 +26,9 @@ final class WitchsHouse extends QuestWorkflow
 	static final Area SHED = new Area(2934,3459,2937,3467);
 	private boolean introPrepared;
 	private boolean combatPrepared;
-	WitchsHouse() { super("witchs_house",226); }
-	@Override boolean finished() { return varp() == 7 || super.finished(); }
+	WitchsHouse() { super("witchs_house"); }
+	@Override int stage() { return PlayerSettings.getConfig(226); }
+	@Override boolean finished() { return stage() == 7 || super.finished(); }
 	@Override void validate()
 	{
 		require(Skills.getRealLevel(Skill.MAGIC) >= 13 && Skills.getRealLevel(Skill.HITPOINTS) >= 12,
@@ -34,12 +36,12 @@ final class WitchsHouse extends QuestWorkflow
 	}
 	@Override boolean checkpointReached(int initial)
 	{
-		return varp() == 6 || varp() == 5 && carried(2411);
+		return stage() == 6 || stage() == 5 && carried(2411);
 	}
 
 	@Override String phase()
 	{
-		int progress = varp();
+		int progress = stage();
 		if (progress <= 2 && !introPrepared && (!carried(1059) || !Inventory.contains(1985))) return "prepare";
 		if (progress == 0) return "accept";
 		if (progress <= 2) return earlyPhase();
@@ -68,7 +70,7 @@ final class WitchsHouse extends QuestWorkflow
 		switch (phase)
 		{
 			case "prepare": prepareIntro(); break;
-			case "accept": talk(new int[]{3994},new Tile(2928,3456),() -> varp() > 0,false,"What's the matter?","Ok, I'll see what I can do.","Yes."); break;
+			case "accept": talk(new int[]{3994},new Tile(2928,3456),() -> stage() > 0,false,"What's the matter?","Ok, I'll see what I can do.","Yes."); break;
 			case "house_key": interact(2867,"Look-under",new Tile(2900,3474),() -> Inventory.contains(2409),false); break;
 			case "enter_house": openAndCross(2861,new Tile(2900,3473),new Tile(2902,3473)); break;
 			case "basement": walk(BASEMENT_ENTRY,0,false); break;
@@ -83,7 +85,7 @@ final class WitchsHouse extends QuestWorkflow
 				Automation.intent("witchs_house.read_diary", () ->
 				{
 					require(Inventory.interact(2408,"Read"),"Witch's diary could not be read");
-					await(() -> varp() >= 5,20,"Witch's diary stage did not update");
+					await(() -> stage() >= 5,20,"Witch's diary stage did not update");
 					require(Widgets.closeAll(),"Witch's diary did not close");
 					return null;
 				}); break;
@@ -125,7 +127,7 @@ final class WitchsHouse extends QuestWorkflow
 			require(Inventory.get(1985).useOn(object(2870,new Tile(2903,3466))),"Cheese could not be placed at the mouse hole");
 			await(() -> npc(4000) != null,50,"Mouse did not appear");
 			require(Inventory.get(2410).useOn(npc(4000)),"Magnet could not be attached to the mouse");
-			await(() -> varp() >= 3,20,"Mouse stage did not update");
+			await(() -> stage() >= 3,20,"Mouse stage did not update");
 			return null;
 		});
 	}

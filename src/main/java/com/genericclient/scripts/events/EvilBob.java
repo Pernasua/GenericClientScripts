@@ -50,7 +50,7 @@ public final class EvilBob extends WorkflowScript
 		require(bob != null && Inventory.get(6200).useOn(bob),"Evil Bob could not be fed");
 		for (int tick = 0; tick < 80 && !EventSupport.message(started,"catnap"); tick++)
 		{
-			EventSupport.dialogue();
+			Conversations.advance();
 			Sleep.sleepTicks(1);
 		}
 		require(EventSupport.message(started,"catnap"),"Evil Bob did not begin his catnap");
@@ -88,7 +88,7 @@ public final class EvilBob extends WorkflowScript
 			require(fishing != null && fishing.interact("Net"),"Fishing interaction failed");
 			for (int tick = 0; tick < 35 && !Inventory.contains(6202,6206); tick++)
 			{
-				EventSupport.dialogue();
+				Conversations.advance();
 				Sleep.sleepTicks(1);
 			}
 			require(Inventory.contains(6202,6206),"Fishing result was not observed");
@@ -112,7 +112,7 @@ public final class EvilBob extends WorkflowScript
 					option.equalsIgnoreCase("yes.") || option.toLowerCase(java.util.Locale.ROOT).startsWith("yes,")).findFirst().orElse(null);
 				require(yes != null && Dialogues.chooseOption(yes),"Wrong-fish destruction confirmation was not recognized");
 			}
-			else EventSupport.dialogue();
+			else Conversations.advance();
 			Sleep.sleepTicks(1);
 		}
 		throw new IllegalStateException("Wrong fish remained in inventory");

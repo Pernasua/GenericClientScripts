@@ -1,5 +1,6 @@
 package com.genericclient.scripts.events;
 
+import com.genericclient.scripts.shared.Conversations;
 import com.genericclient.script.Automation;
 import com.genericclient.script.ScriptSettings;
 import com.genericclient.scripts.shared.WorkflowScript;
@@ -23,7 +24,7 @@ public final class CountCheck extends WorkflowScript
 			{
 				if (Dialogues.inDialogue())
 				{
-					EventSupport.dialogue("Check my account, Count Check!","I'll see you another time.");
+					Conversations.advance("Check my account, Count Check!","I'll see you another time.");
 					Sleep.sleepTicks(1);
 					continue;
 				}

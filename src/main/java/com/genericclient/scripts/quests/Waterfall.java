@@ -1,5 +1,6 @@
 package com.genericclient.scripts.quests;
 
+import org.dreambot.api.methods.settings.PlayerSettings;
 import com.genericclient.scripts.shared.Jewellery;
 import com.genericclient.scripts.shared.Supplies;
 import com.genericclient.scripts.shared.Supply;
@@ -29,24 +30,25 @@ final class Waterfall extends QuestWorkflow
 	private boolean gnomePrepared;
 	private boolean tombPrepared;
 	private boolean finalPrepared;
-	Waterfall() { super("waterfall_quest",65); }
+	Waterfall() { super("waterfall_quest"); }
+	@Override int stage() { return PlayerSettings.getConfig(65); }
 	@Override void validate() { require(Skills.getRealLevel(Skill.HITPOINTS) >= 15,"Waterfall requires at least 15 Hitpoints for this route"); foodGuard(true); }
 	@Override int checkpoint()
 	{
 		if (finished()) return 7;
-		if (varp() == 0) return 0;
-		if (varp() <= 2) return 1;
+		if (stage() == 0) return 0;
+		if (stage() <= 2) return 1;
 		if (carried(295) && carried(296) || finalPrepared) return 4;
 		if (TOMB.contains(tile()) || carried(294)) return 3;
 		return 2;
 	}
 	@Override String phase()
 	{
-		if (varp() == 0) return initialPrepared ? "accept" : "prepare_initial";
-		if (varp() == 1) return HUDON.contains(tile()) ? "talk_hudon" : "raft";
-		if (varp() == 2) return investigation();
-		if (varp() >= 3 && varp() <= 8) return treasures();
-		throw new IllegalStateException("Unexpected Waterfall stage: " + varp());
+		if (stage() == 0) return initialPrepared ? "accept" : "prepare_initial";
+		if (stage() == 1) return HUDON.contains(tile()) ? "talk_hudon" : "raft";
+		if (stage() == 2) return investigation();
+		if (stage() >= 3 && stage() <= 8) return treasures();
+		throw new IllegalStateException("Unexpected Waterfall stage: " + stage());
 	}
 	private String investigation()
 	{

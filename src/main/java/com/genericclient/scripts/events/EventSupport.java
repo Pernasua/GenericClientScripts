@@ -1,12 +1,12 @@
 package com.genericclient.scripts.events;
 
+import com.genericclient.scripts.shared.Conversations;
 import com.genericclient.scripts.shared.WorkflowScript;
 import com.genericclient.script.Automation;
 import com.genericclient.script.SnapshotData;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import org.dreambot.api.methods.dialogues.Dialogues;
 import org.dreambot.api.methods.interactive.NPCs;
 import org.dreambot.api.utilities.Sleep;
 import org.dreambot.api.utilities.impl.Condition;
@@ -46,19 +46,6 @@ final class EventSupport
 		}
 		return false;
 	}
-	static void dialogue(String... preferredChoices)
-	{
-		if (Dialogues.canContinue())
-		{
-			if (!Dialogues.continueDialogue()) throw new IllegalStateException("Random-event dialogue did not continue");
-		}
-		else if (Dialogues.inDialogue())
-		{
-			String[] offered = Dialogues.getOptions();
-			String choice = Arrays.stream(preferredChoices).filter(value -> Arrays.asList(offered).contains(value)).findFirst().orElse(null);
-			if (choice == null || !Dialogues.chooseOption(choice)) throw new IllegalStateException("Unexpected random-event choices: " + Arrays.toString(offered));
-		}
-	}
 	static void await(Condition condition, int ticks, String failure)
 	{
 		if (!Sleep.sleepUntil(condition,ticks * 600L)) throw new IllegalStateException(failure);
@@ -72,7 +59,7 @@ final class EventSupport
 			for (int tick = 0; tick < 100; tick++)
 			{
 				if (ready.verify()) return null;
-				dialogue(choices);
+				Conversations.advance(choices);
 				Sleep.sleepTicks(1);
 			}
 			throw new IllegalStateException("Random-event activity did not open");		});

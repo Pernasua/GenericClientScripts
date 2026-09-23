@@ -30,7 +30,7 @@ final class GrandTreeFinale
 			case "prepare_combat": quest.prepare(List.of(new Supply(1387,"Staff of fire",1,5000),new Supply(558,"Mind rune",300,20),
 				new Supply(556,"Air rune",600,20),new Supply(379,"Lobster",6,500),QuestWorkflow.duelingRing())); break;
 			case "demon": fight(); break;
-			case "cave_king": reachCaveKing(); quest.talk(GnomeTravel.KING,null,() -> quest.varp() >= 150,false); break;
+			case "cave_king": reachCaveKing(); quest.talk(GnomeTravel.KING,null,() -> quest.stage() >= 150,false); break;
 			case "rock": findRock(); break;
 			case "return_rock": reachCaveKing(); quest.talk(GnomeTravel.KING,null,quest::finished,false); break;
 			default:throw new IllegalArgumentException("Unknown Grand Tree finale phase: " + phase);
@@ -65,7 +65,7 @@ final class GrandTreeFinale
 		Travel.to(safe,0,"combat",WorkflowScript.NO_DISCRETIONARY);
 		NPC demon = QuestWorkflow.npc(1432);
 		QuestWorkflow.require(demon.distance() >= 4 && QuestCombat.lineOfSight(demon),"Black demon safespot was not established");
-		QuestCombat.monitor(new int[]{1432},() -> quest.varp() >= 140,900,
+		QuestCombat.monitor(new int[]{1432},() -> quest.stage() >= 140,900,
 			target -> QuestWorkflow.require(QuestWorkflow.tile().equals(safe),"Black demon safespot was lost"));
 	}
 	private void reachCaveKing()

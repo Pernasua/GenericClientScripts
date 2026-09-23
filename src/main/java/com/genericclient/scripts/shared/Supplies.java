@@ -88,11 +88,17 @@ public final class Supplies
 		WorkflowScript.await(org.dreambot.api.methods.grandexchange.GrandExchange::isOpen,6000,"Grand Exchange did not open");
 		for (Supply supply : requested)
 		{
-			Map<String, Object> receipt = ScriptScope.current().execute("ge.buy", Map.of(
+			Map<String,Object> request = Map.of(
 				"item_id", supply.id, "item_name", supply.name, "quantity", supply.quantity,
 				"maximum_unit_price", supply.maximumPrice, "minimum_cash_reserve", CASH_RESERVE,
-				"collect_mode", "bank"), 240_000);
-			WorkflowScript.require("complete".equals(receipt.get("status")), "Purchase failed: " + supply.name + " " + receipt);
+				"collect_mode", "bank");
+			while (true)
+			{
+				Map<String,Object> receipt = ScriptScope.current().execute("ge.buy",request,240_000);
+				if ("complete".equals(receipt.get("status"))) break;
+				WorkflowScript.require("placed".equals(receipt.get("status")) && "ge_offer_pending".equals(receipt.get("result")),
+					"Purchase failed: " + supply.name + " (" + receipt.get("status") + ": " + receipt.get("result") + ")");
+			}
 		}
 		WorkflowScript.require(SnapshotData.action("ui.close", Map.of()), "Exchange did not close");
 	}

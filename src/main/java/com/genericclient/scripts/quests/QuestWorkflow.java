@@ -3,6 +3,7 @@ package com.genericclient.scripts.quests;
 import com.genericclient.script.Automation;
 import com.genericclient.script.ScriptScope;
 import com.genericclient.script.SnapshotData;
+import com.genericclient.scripts.shared.Conversations;
 import com.genericclient.scripts.shared.Jewellery;
 import com.genericclient.scripts.shared.Supplies;
 import com.genericclient.scripts.shared.Supply;
@@ -13,7 +14,6 @@ import java.util.List;
 import java.util.Map;
 import org.dreambot.api.methods.container.impl.Inventory;
 import org.dreambot.api.methods.container.impl.equipment.Equipment;
-import org.dreambot.api.methods.dialogues.Dialogues;
 import org.dreambot.api.methods.interactive.GameObjects;
 import org.dreambot.api.methods.interactive.NPCs;
 import org.dreambot.api.methods.magic.Magic;
@@ -31,14 +31,13 @@ import org.dreambot.api.wrappers.items.Item;
 abstract class QuestWorkflow
 {
 	final String key;
-	final int varpId;
 	final boolean purchase;
 	final String scope;
 	private int initialCheckpoint;
 
-	QuestWorkflow(String key, int varpId)
+	QuestWorkflow(String key)
 	{
-		this.key = key; this.varpId = varpId;
+		this.key = key;
 		purchase = "ge".equals(Automation.input("restock"));
 		scope = Automation.input("scope");
 	}
@@ -53,11 +52,11 @@ abstract class QuestWorkflow
 			if (finished())
 			{
 				SnapshotData.action("safety.clear",Map.of());
-				return Map.of("status","complete","quest",key,"varp",varp());
+				return Map.of("status","complete","quest",key,"stage",stage());
 			}
 			if ("stop_safely".equals(Automation.nextAction())) { escape(); return Map.of("status","stopped","quest",key); }
 			if (scope.equals("checkpoint") && checkpointReached(initialCheckpoint))
-				return Map.of("status","checkpoint","quest",key,"varp",varp());
+				return Map.of("status","checkpoint","quest",key,"stage",stage());
 			String phase = phase();
 			Automation.overlay(Map.of("Quest",key,"Phase",phase));
 			Automation.phase("quest." + key + "." + phase,Map.of("policy",WorkflowScript.NO_DISCRETIONARY));
@@ -70,9 +69,9 @@ abstract class QuestWorkflow
 	abstract void execute(String phase);
 	abstract void validate();
 	abstract void escape();
-	int checkpoint() { return varp(); }
+	int checkpoint() { return stage(); }
 	boolean checkpointReached(int initial) { return checkpoint() > initial; }
-	int varp() { return PlayerSettings.getConfig(varpId); }
+	abstract int stage();
 	int bit(int id) { return PlayerSettings.getBitValue(id); }
 	boolean finished() { return "finished".equals(SnapshotData.map(SnapshotData.read("quests").get(key)).get("state")); }
 	static Tile tile() { return WorkflowScript.player().getTile(); }
@@ -94,14 +93,14 @@ abstract class QuestWorkflow
 	}
 	void interact(int id, String action, Tile point, Condition complete, boolean hazardous)
 	{
-		if (point != null && point.getZ() == tile().getZ()) walk(point,3,hazardous);
+		if (point != null && point.getZ() == tile().getZ()) walk(point,1,hazardous);
 		GameObject target = object(id,point);
 		require(target != null && target.interact(action),"Quest object interaction failed: " + id + " " + action);
 		await(complete,50,"Quest object result was not observed: " + id);
 	}
 	void use(int item, int object, Tile point, Condition complete, boolean hazardous)
 	{
-		if (point != null && point.getZ() == tile().getZ()) walk(point,3,hazardous);
+		if (point != null && point.getZ() == tile().getZ()) walk(point,1,hazardous);
 		GameObject target = object(object,point);
 		Item held = Inventory.get(item);
 		require(held != null && target != null && held.useOn(target),"Quest item use failed: " + item + " on " + object);
@@ -119,6 +118,9 @@ abstract class QuestWorkflow
 	{
 		if (complete.verify()) return;
 		if (point != null) walk(point,5,hazardous);
+		NPC approach = npc(ids);
+		require(approach != null,"Quest NPC was not found: " + Arrays.toString(ids));
+		walk(approach.getTile(),0,hazardous);
 		Automation.intent(key + ".talk", () ->
 		{
 			NPC target = NPCs.closest(candidate -> Arrays.stream(ids).anyMatch(id -> candidate.getId() == id) && candidate.hasAction("Talk-to"));
@@ -148,16 +150,11 @@ abstract class QuestWorkflow
 					}
 				}
 				if (advancedMessage) { Sleep.sleepTicks(1); continue; }
-				if (Dialogues.canContinue()) require(Dialogues.continueDialogue(),"Quest dialogue did not continue");
-				else if (Dialogues.inDialogue())
-				{
-					String selected = Arrays.stream(choices).filter(choice -> Arrays.asList(Dialogues.getOptions()).contains(choice)).findFirst().orElse(null);
-					require(selected != null && Dialogues.chooseOption(selected),"Unexpected quest dialogue: " + Arrays.toString(Dialogues.getOptions()));
-				}
+				Conversations.advance(choices);
 				Sleep.sleepTicks(1);
 			}
-			throw new IllegalStateException("Quest dialogue result was not observed");		});
-
+			throw new IllegalStateException("Quest dialogue result was not observed");
+		});
 	}
 	void prepare(List<Supply> supplies)
 	{
@@ -166,12 +163,12 @@ abstract class QuestWorkflow
 	}
 	void toExchange()
 	{
-		if (Travel.GRAND_EXCHANGE.distance() <= 8) return;
+		if (Travel.GRAND_EXCHANGE.distance() <= 2) return;
 		if (Jewellery.carried(Jewellery.Destination.GRAND_EXCHANGE)) Jewellery.teleport(Jewellery.Destination.GRAND_EXCHANGE);
 		else if (Jewellery.carried(Jewellery.Destination.BURTHORPE)) Jewellery.teleport(Jewellery.Destination.BURTHORPE);
 		else if (Jewellery.carried(Jewellery.Destination.EMIRS_ARENA)) Jewellery.teleport(Jewellery.Destination.EMIRS_ARENA);
 		else if (Travel.GRAND_EXCHANGE.distance() > 120) require(Magic.castSpell(Normal.HOME_TELEPORT),"Quest preparation needs a safe transport to a bank");
-		Travel.to(Travel.GRAND_EXCHANGE,8);
+		Travel.to(Travel.GRAND_EXCHANGE,2);
 	}
 	static Supply necklace() { return new Supply(3853,"Games necklace",1,1000,3855,3857,3859,3861,3863,3865,3867); }
 	static Supply duelingRing() { return new Supply(2552,"Ring of dueling",1,1000,2554,2556,2558,2560,2562,2564,2566); }

@@ -23,9 +23,9 @@ final class WaterfallNavigation
 	{
 		switch (phase)
 		{
-			case "accept": nearFalls(); quest.talk(new int[]{4181},new Tile(2521,3495),() -> quest.varp() >= 1,false,"Yes."); break;
+			case "accept": nearFalls(); quest.talk(new int[]{4181},new Tile(2521,3495),() -> quest.stage() >= 1,false,"Yes."); break;
 			case "raft": nearFalls(); quest.walk(HUDON_LANDING,1,false); break;
-			case "talk_hudon": quest.talk(new int[]{4182},new Tile(2511,3484),() -> quest.varp() >= 2,false); break;
+			case "talk_hudon": quest.talk(new int[]{4182},new Tile(2511,3484),() -> quest.stage() >= 2,false); break;
 			case "cross_rock": crossRock(); break;
 			case "descend_tree": useRope(2020,new Tile(2512,3465),Waterfall.LEDGE); break;
 			case "barrel": quest.interact(2022,"Get in",new Tile(2512,3463),() -> !Waterfall.LEDGE.contains(QuestWorkflow.tile()),false); break;
@@ -35,7 +35,7 @@ final class WaterfallNavigation
 				Automation.intent("waterfall.read_book", () ->
 				{
 					QuestWorkflow.require(Inventory.interact(292,"Read"),"Waterfall book did not open");
-					quest.dialogue(() -> quest.varp() >= 3,30);
+					quest.dialogue(() -> quest.stage() >= 3,30);
 					QuestWorkflow.require(Widgets.closeAll(),"Waterfall book did not close");
 					return null;
 				}); break;

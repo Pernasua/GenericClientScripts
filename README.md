@@ -37,7 +37,7 @@ the client. No backup of the retired catalog is created.
 
 - AIO Prayer, Magic, Melee, Agility, and Thieving
 - Quest Runner: Witch's House, Waterfall, Tree Gnome Village, Fight Arena,
-  The Grand Tree, and Monkey Madness I
+  The Grand Tree, Monkey Madness I, Romeo & Juliet, and Goblin Diplomacy
 - Account Auditor, Walker, Walk Stress, Prison Guard Observer, and XP Lamp
 - Death Recovery and Safety Net
 - Genie, Rick Turpentine, Drunken Dwarf, Count Check, Certer, Capt' Arnav, Mime,

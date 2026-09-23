@@ -1,5 +1,6 @@
 package com.genericclient.scripts.quests;
 
+import com.genericclient.scripts.shared.Conversations;
 import com.genericclient.scripts.shared.WorkflowScript;
 import com.genericclient.script.Automation;
 import com.genericclient.script.SnapshotData;
@@ -50,7 +51,7 @@ final class WitchExperiment
 				"world",Map.of("x",2935,"y",3460,"plane",0),"within",10)),"Experiment did not respond to the ball");
 			QuestWorkflow.await(() -> current() >= 0,20,"Experiment did not spawn");
 		}
-		for (int form = current(); form < FORMS.length && quest.varp() < 6; form++)
+		for (int form = current(); form < FORMS.length && quest.stage() < 6; form++)
 		{
 			if (next(form)) continue;
 			if (!Equipment.contains(2550) && Inventory.contains(2550)) Supplies.equip(2550);
@@ -58,7 +59,7 @@ final class WitchExperiment
 			if (form < 2) lureNorth(form); else move(safe);
 			if (!next(form)) defeat(form,safe);
 		}
-		QuestWorkflow.require(quest.varp() >= 6,"Experiment completion was not observed");
+		QuestWorkflow.require(quest.stage() >= 6,"Experiment completion was not observed");
 	}
 	private void lureNorth(int form)
 	{
@@ -91,7 +92,7 @@ final class WitchExperiment
 			QuestWorkflow.require(QuestWorkflow.tile().equals(safe),"Experiment safespot was lost");
 			if (Dialogues.canContinue())
 			{
-				QuestWorkflow.require(Dialogues.continueDialogue(),"Combat dialogue did not continue");
+				Conversations.continuePage();
 				attack(form);
 			}
 		}
@@ -114,6 +115,6 @@ final class WitchExperiment
 	}
 	private void move(Tile point) { Travel.to(point,0,"combat",WorkflowScript.NO_DISCRETIONARY); }
 	private boolean at(int form, Tile point) { NPC target = QuestWorkflow.npc(FORMS[form]); return target != null && target.getTile().equals(point); }
-	private boolean next(int form) { return form == 3 ? quest.varp() >= 6 && QuestWorkflow.npc(FORMS[form]) == null : QuestWorkflow.npc(FORMS[form+1]) != null; }
+	private boolean next(int form) { return form == 3 ? quest.stage() >= 6 && QuestWorkflow.npc(FORMS[form]) == null : QuestWorkflow.npc(FORMS[form+1]) != null; }
 	private int current() { for (int i = 0; i < FORMS.length; i++) if (QuestWorkflow.npc(FORMS[i]) != null) return i; return -1; }
 }

@@ -1,5 +1,6 @@
 package com.genericclient.scripts.quests;
 
+import org.dreambot.api.methods.settings.PlayerSettings;
 import com.genericclient.scripts.shared.WorkflowScript;
 import com.genericclient.script.Automation;
 import com.genericclient.scripts.shared.Jewellery;
@@ -22,7 +23,8 @@ final class MonkeyMadness extends QuestWorkflow
 	private final MonkeyDungeon dungeon = new MonkeyDungeon(this);
 	private final MonkeyAmulet amulet = new MonkeyAmulet(this,prison);
 	private int completedSteps;
-	MonkeyMadness() { super("monkey_madness_i",365); }
+	MonkeyMadness() { super("monkey_madness_i"); }
+	@Override int stage() { return PlayerSettings.getConfig(365); }
 	@Override void validate()
 	{
 		require("finished".equals(com.genericclient.script.SnapshotData.map(com.genericclient.script.SnapshotData.read("quests").get("the_grand_tree")).get("state")) &&
@@ -47,19 +49,19 @@ final class MonkeyMadness extends QuestWorkflow
 	@Override int checkpoint() { return completedSteps; }
 	@Override String phase()
 	{
-		if (varp() == 0) return "start";
-		if (varp() <= 2)
+		if (stage() == 0) return "start";
+		if (stage() <= 2)
 		{
 			String phase = preludePhase();
 			if (phase != null) return phase;
 		}
-		if (varp() <= 3 && bit(126) < 2 && Arrays.stream(RETAINED).noneMatch(id -> Supplies.owned(id) > 0))
+		if (stage() <= 3 && bit(126) < 2 && Arrays.stream(RETAINED).noneMatch(id -> Supplies.owned(id) > 0))
 			return MonkeyAreas.ape() ? "garkor" : matches(MonkeyLoadouts.APE_ATOLL_LOADOUT) ? "ape" : "prepare_ape";
-		if (varp() == 3) return amuletPhase();
-		if (varp() == 4) return favorPhase();
-		if (varp() == 5) return battlePhase();
-		if (varp() >= 6) return "finish";
-		throw new IllegalStateException("Unexpected Monkey Madness stage: " + varp());
+		if (stage() == 3) return amuletPhase();
+		if (stage() == 4) return favorPhase();
+		if (stage() == 5) return battlePhase();
+		if (stage() >= 6) return "finish";
+		throw new IllegalStateException("Unexpected Monkey Madness stage: " + stage());
 	}
 	private String battlePhase()
 	{
@@ -156,7 +158,7 @@ final class MonkeyMadness extends QuestWorkflow
 			case "finish_amulet": amulet.leaveTemple(); break;
 			case "talisman": new MonkeyTalisman(prison).obtain(); break;
 			case "greegree": greegree(); break;
-			case "sync_greegree": await(() -> varp() >= 4,30,"Greegree quest progress did not synchronize"); break;
+			case "sync_greegree": await(() -> stage() >= 4,30,"Greegree quest progress did not synchronize"); break;
 			case "zoo": favor.zoo(); break;
 			case "carry_monkey": favor.carry(); break;
 			case "favor": favor.favor(); break;

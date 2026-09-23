@@ -5,15 +5,119 @@ import static org.junit.Assert.*;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import com.genericclient.script.ScriptScope;
+import com.genericclient.scripts.shared.Conversations;
 import org.dreambot.api.methods.map.Tile;
 import org.junit.Test;
 
 public class QuestDialogueContractsTest
 {
+    @Test public void anUnchangingConversationStopsAtItsBoundedLimit()
+    {
+        QuestScenario game = new QuestScenario("goblin_diplomacy",62,0,new Tile(2958,3512));
+        game.dialogue = Map.of("open",true,"type","continue","options",List.of());
+        game.input = (type,args) -> assertEquals("dialogue.continue",type);
+        ScriptScope scope = new ScriptScope(game);
+        try (scope)
+        {
+            try { Conversations.finish(); fail("An unchanging conversation was reported as finished"); }
+            catch (IllegalStateException expected) { assertEquals("Dialogue did not finish",expected.getMessage()); }
+        }
+        assertTrue(game.actions.size() <= 80);
+    }
+
+    @Test public void conversationHistoryRecordsOnlyTheReplyThatWasApplied()
+    {
+        for (boolean changed : List.of(false,true))
+        {
+            QuestScenario game = new QuestScenario("monkey_madness_i",365,0,new Tile(2464,3492,1));
+            List<Map<String,Object>> options = List.of(Map.of("index",1L,"text","Leave..."),Map.of("index",2L,"text","How will I travel?"));
+            game.input = (type,args) ->
+            {
+                assertEquals("dialogue.choose",type);
+                assertEquals(Map.of("index",2L,"text","How will I travel?"),args);
+                if (changed) game.receipt = Map.of("status","rejected","result","exact_dialogue_choice_not_visible");
+                else game.stage = 3;
+            };
+            ScriptScope scope = new ScriptScope(game);
+            try (scope)
+            {
+                assertEquals(changed ? null : "How will I travel?",Conversations.choose(options,"How will I travel?","Leave..."));
+            }
+            assertEquals(changed ? 0 : 3,game.stage);
+        }
+    }
+
+    @Test public void aContinueChangingToAChoiceIsRetriedButOtherRejectionsStop()
+    {
+        for (boolean changed : List.of(false,true))
+        {
+            QuestScenario game = new QuestScenario("goblin_diplomacy",62,0,new Tile(2958,3512));
+            game.inventory.putAll(Map.of(286,1,287,1,288,1));
+            game.npc(669,"General Bentnoze",game.position,"Talk-to");
+            game.input = (type,args) ->
+            {
+                if (type.equals("npc.interact"))
+                    game.dialogue = Map.of("open",true,"type","continue","options",List.of());
+                else if (type.equals("dialogue.continue"))
+                {
+                    game.receipt = Map.of("status","rejected","result",changed ? "dialogue_is_choice" : "hover_has_no_matching_action");
+                    game.dialogue = Map.of("open",true,"type","choice","options",List.of(Map.of("index",1L,"text","Yes, he looks fat.")));
+                }
+                else
+                {
+                    assertEquals("dialogue.choose",type);
+                    assertEquals("Yes, he looks fat.",args.get("text"));
+                    game.transitions.add(() -> game.stage = 3);
+                }
+            };
+            if (changed)
+            {
+                game.run();
+                assertEquals(Map.of("status","checkpoint","quest","goblin_diplomacy","stage",3),game.result);
+            }
+            else
+            {
+                try { game.run(); fail("An input rejection was ignored"); }
+                catch (IllegalStateException expected) { assertTrue(expected.getMessage().startsWith("Dialogue did not continue:")); }
+                assertEquals(0,game.stage);
+            }
+        }
+    }
+
+    @Test public void aChoiceChangingToContinueBetweenReadsDoesNotBecomeAnEmptyChoiceFailure()
+    {
+        QuestScenario game = new QuestScenario("goblin_diplomacy",62,0,new Tile(2958,3512));
+        game.inventory.putAll(Map.of(286,1,287,1,288,1));
+        game.npc(669,"General Bentnoze",game.position,"Talk-to");
+        AtomicInteger reads = new AtomicInteger();
+        game.beforeRead = subject ->
+        {
+            if (subject.equals("dialogue") && reads.incrementAndGet() >= 2)
+                game.dialogue = Map.of("open",true,"type","continue","options",List.of());
+        };
+        game.input = (type,args) ->
+        {
+            if (type.equals("npc.interact"))
+                game.dialogue = Map.of("open",true,"type","choice","options",
+                    List.of(Map.of("index",1L,"text","Do you want me to pick an armour colour for you?")));
+            else if (type.equals("dialogue.choose"))
+                game.receipt = Map.of("status","rejected","result","exact_dialogue_choice_not_visible");
+            else
+            {
+                assertEquals("dialogue.continue",type);
+                game.transitions.add(() -> game.stage = 3);
+            }
+        };
+        game.run();
+        assertEquals(Map.of("status","checkpoint","quest","goblin_diplomacy","stage",3),game.result);
+        assertEquals(List.of("npc.interact","dialogue.choose","dialogue.continue"),game.actions);
+    }
+
     @Test public void alreadyCompletedQuestsDoNotPrepareOrReplayTheirStages()
     {
         Map<String,Integer> quests=Map.of("witchs_house",226,"waterfall",65,"tree_gnome_village",111,
-            "fight_arena",17,"the_grand_tree",150,"monkey_madness_i",365);
+            "fight_arena",17,"the_grand_tree",150,"monkey_madness_i",365,"romeo__juliet",144,"goblin_diplomacy",62);
         for (Map.Entry<String,Integer> quest : quests.entrySet())
         {
             QuestScenario game=new QuestScenario(quest.getKey(),quest.getValue(),0,new Tile(3165,3491));
@@ -92,7 +196,7 @@ public class QuestDialogueContractsTest
         };
         game.run();
         assertEquals(2,boxes.get());
-        assertEquals(Map.of("status","checkpoint","quest","tree_gnome_village","varp",4),game.result);
+        assertEquals(Map.of("status","checkpoint","quest","tree_gnome_village","stage",4),game.result);
         assertNull(game.intents.current);
     }
 
@@ -114,7 +218,10 @@ public class QuestDialogueContractsTest
                 }
             };
             try { game.run(); fail("The failed dialogue was accepted"); }
-            catch (IllegalStateException failure) { assertEquals("Unexpected quest dialogue: ["+choice+"]",failure.getMessage()); }
+            catch (IllegalStateException failure)
+            {
+                assertEquals(offered ? "Dialogue choice failed: " + choice : "Unexpected dialogue choices: [" + choice + "]",failure.getMessage());
+            }
             assertEquals(offered ? 1 : 0,game.actions.stream().filter("dialogue.choose"::equals).count());
             assertEquals(3,game.stage);
             assertNull(game.intents.current);
@@ -137,7 +244,7 @@ public class QuestDialogueContractsTest
             }
         };
         game.run();
-        assertEquals(Map.of("status","complete","quest","tree_gnome_village","varp",9),game.result);
+        assertEquals(Map.of("status","complete","quest","tree_gnome_village","stage",9),game.result);
         assertTrue(game.safety.isEmpty());
         assertEquals("safety.clear",game.actions.get(game.actions.size()-1));
     }

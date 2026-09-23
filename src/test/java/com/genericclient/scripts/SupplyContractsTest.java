@@ -13,6 +13,34 @@ public class SupplyContractsTest
 {
     @Test public void purchasesOnlyAfterTheExchangeWindowOpensAndPreservesTheReserve()
     {
+        java.util.concurrent.atomic.AtomicInteger offerChecks = new java.util.concurrent.atomic.AtomicInteger();
+        CatalogEnvironment game = exchange(offerChecks,Map.of("status","placed","result","ge_offer_pending","quantity_bought",1,"spent",3000));
+        game.run();
+        assertEquals(Map.of("supplied",2),game.result);
+        assertEquals(5_000_000,(int)game.bank.get(995));
+        assertFalse(game.inventory.containsKey(995));
+        assertEquals("Pending offers must be resumed before supplies are declared ready",2,offerChecks.get());
+    }
+
+    @Test public void terminalRejectionsAreNotRetriedOrReportedAsSupplied()
+    {
+        for (String status : List.of("rejected","placed"))
+        {
+            java.util.concurrent.atomic.AtomicInteger checks = new java.util.concurrent.atomic.AtomicInteger();
+            CatalogEnvironment game = exchange(checks,Map.of("status",status,"result","invalid_offer"));
+            try { game.run(); fail("A terminal purchase result was retried"); }
+            catch (IllegalStateException expected)
+            {
+                assertEquals("Purchase failed: Dragon bones (" + status + ": invalid_offer)",expected.getMessage());
+            }
+            assertEquals(1,checks.get());
+            assertFalse(game.bank.containsKey(536));
+            assertNull(game.result);
+        }
+    }
+
+    private static CatalogEnvironment exchange(java.util.concurrent.atomic.AtomicInteger offerChecks, Map<String,Object> firstReply)
+    {
         CatalogEnvironment game = new CatalogEnvironment(new WorkflowScript()
         {
             @Override protected Object runWorkflow()
@@ -54,7 +82,12 @@ public class SupplyContractsTest
                     assertEquals(2,arguments.get("quantity"));
                     assertEquals(3000,arguments.get("maximum_unit_price"));
                     assertEquals(5_000_000L,arguments.get("minimum_cash_reserve"));
-                    inventory.remove(995);
+                    if (offerChecks.incrementAndGet() == 1)
+                    {
+                        // A terminal response can follow an offer that already reserved the coins.
+                        inventory.remove(995);
+                        return firstReply;
+                    }
                     bank.put(536,2);
                     return Map.of("status","complete");
                 }
@@ -63,9 +96,6 @@ public class SupplyContractsTest
             }
         };
         game.bank.put(995,5_006_000);
-        game.run();
-        assertEquals(Map.of("supplied",2),game.result);
-        assertEquals(5_000_000,(int)game.bank.get(995));
-        assertFalse(game.inventory.containsKey(995));
+        return game;
     }
 }

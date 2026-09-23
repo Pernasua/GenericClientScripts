@@ -22,6 +22,9 @@ progress intact.
 **Checkpoint:** A meaningful observed quest boundary selected by the operator.
 It can be finer than a quest stage variable changing.
 
+**Stage:** The quest's progression value. Each workflow selects its native source;
+a packed varp may also contain flags that are not part of the stage.
+
 **Cooperative stop:** A request to finish the current bounded action before ending
 the workflow.
 

@@ -1,5 +1,6 @@
 package com.genericclient.scripts.training;
 
+import com.genericclient.scripts.shared.Conversations;
 import com.genericclient.script.Automation;
 import com.genericclient.script.ScriptSettings;
 import com.genericclient.script.SnapshotData;
@@ -89,7 +90,7 @@ public final class MagicTrainer extends WorkflowScript
 		{
 			while (Skills.getExperience(Skill.MAGIC) < goal && !pollStop())
 			{
-				if (Dialogues.canContinue()) require(Dialogues.continueDialogue(), "Combat dialogue did not continue");
+				if (Dialogues.canContinue()) Conversations.continuePage();
 				CombatSpell current = spell();
 				Supplies.equip(current.staff);
 				if (configured != current.spell)

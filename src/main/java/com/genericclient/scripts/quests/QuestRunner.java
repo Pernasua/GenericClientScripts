@@ -9,8 +9,8 @@ import org.dreambot.api.script.ScriptManifest;
 @ScriptManifest(name="Quest Runner",author="GenericClient",category=Category.QUEST,version=1,
 	description="Run the maintained quest workflows from observed progress and inventory.")
 @ScriptSettings(id="quest-runner",inputs={
-	@ScriptSettings.Input(id="quest",label="Quest",choices={"witchs_house","waterfall","tree_gnome_village","fight_arena","the_grand_tree","monkey_madness_i"},
-		labels={"Witch's House","Waterfall Quest","Tree Gnome Village","Fight Arena","The Grand Tree","Monkey Madness I"},defaultValue="witchs_house"),
+	@ScriptSettings.Input(id="quest",label="Quest",choices={"witchs_house","waterfall","tree_gnome_village","fight_arena","the_grand_tree","monkey_madness_i","romeo__juliet","goblin_diplomacy"},
+		labels={"Witch's House","Waterfall Quest","Tree Gnome Village","Fight Arena","The Grand Tree","Monkey Madness I","Romeo & Juliet","Goblin Diplomacy"},defaultValue="witchs_house"),
 	@ScriptSettings.Input(id="restock",label="Restock",choices={"ge","bank_only"},labels={"Grand Exchange","Bank only"},defaultValue="ge"),
 	@ScriptSettings.Input(id="scope",label="Scope",choices={"complete","checkpoint","prison_cell"},labels={"Quest completion","Next checkpoint","Monkey Madness prison cell"},defaultValue="complete")
 },actions=@ScriptSettings.Button(id="stop_safely",label="Stop safely"))
@@ -33,6 +33,8 @@ public final class QuestRunner extends WorkflowScript
 			case "fight_arena":return new FightArena();
 			case "the_grand_tree":return new GrandTree();
 			case "monkey_madness_i":return new MonkeyMadness();
+			case "romeo__juliet":return new RomeoAndJuliet();
+			case "goblin_diplomacy":return new GoblinDiplomacy();
 			default:throw new IllegalArgumentException("Unknown quest: " + key);
 		}
 	}
