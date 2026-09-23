@@ -12,9 +12,16 @@ Use a JDK 11 or newer and keep the GenericClient checkout beside this repository
 ./gradlew build -PgenericClientDir=../GenericClient
 ```
 
-The build produces `build/libs/GenericClientScripts.jar`. It compiles against
-`GenericClient-script-api.jar`, built by the client project. To use an already
-built SDK, pass `-PscriptApiJar=/absolute/path/GenericClient-script-api.jar`.
+The build produces **one JAR per selectable script** in `build/libs/`, such as
+`snape-grass-collector.jar`, `aio-magic.jar`, and `quest-runner.jar`. Each contains
+its required helper classes and resources; no shared-library JAR is needed.
+The SDK is provided by GenericClient, not bundled in these files. `jar` and
+`scriptJars` also generate the individual files. The old combined
+`GenericClientScripts.jar` is no longer produced.
+
+Compilation uses `GenericClient-script-api.jar`, built by the client project.
+To use an already built SDK, pass
+`-PscriptApiJar=/absolute/path/GenericClient-script-api.jar`.
 
 Stop active scripts before replacing their JAR. Install from Bash:
 
@@ -28,9 +35,39 @@ Or from PowerShell:
 .\install.ps1
 ```
 
-The installer copies the JAR to `~/.runelite/genericclient/scripts/`, verifies the
-copy, and leaves other script JARs in place. Reload the catalog in GenericClient,
-call the MCP `script_reload` tool, or restart the client.
+These commands install the full set from `build/libs/`, verifying `scripts.sha256`
+before changing installed files. An existing combined `GenericClientScripts.jar`
+is moved to a backup outside the scanned script directory. Replaced individual
+JARs are backed up too; unrelated user JARs are preserved. Failed copies restore
+the affected installed files.
+
+To install just one script after migration, pass its JAR:
+
+```bash
+./install.sh build/libs/snape-grass-collector.jar
+```
+
+```powershell
+.\install.ps1 -Source .\build\libs\snape-grass-collector.jar
+```
+
+A single-file install refuses to proceed while the old combined catalog exists,
+rather than remove its other scripts or create duplicate registrations.
+Use the full-directory installer once to migrate an existing catalog.
+
+### Sharing a script
+
+Give the recipient only the desired `<script-id>.jar`. They need a compatible
+GenericClient installation and authorization, but no compiler or SDK download.
+With scripts stopped, copy the file into
+`%USERPROFILE%\.runelite\genericclient\scripts` on Windows, or
+`~/.runelite/genericclient/scripts` elsewhere. Then use **Scripts → Reload list**.
+Do not extract or double-click the JAR. Do not leave the old combined catalog or
+renamed copies of the same script in that folder.
+
+Quest Runner remains one selectable script with its existing quest choices.
+Safety/recovery scripts and random-event solvers are separate catalog entries,
+not additional entry points silently bundled in another script's JAR.
 
 ## Included scripts
 
@@ -51,9 +88,19 @@ state, with explicit checkpoints and verified action results.
 
 ## Writing scripts
 
-Scripts extend DreamBot's `AbstractScript` and use `@ScriptManifest`. The optional
+Scripts extend DreamBot's `AbstractScript` and use `@ScriptManifest`.
 GenericClient `@ScriptSettings` declares the catalog ID, inputs, buttons, and
-random-event NPC IDs. Each JAR may contain several entry points and shared classes.
+random-event NPC IDs. Every entry in this maintained catalog must have a unique
+kebab-case ID; that ID is its JAR filename. New annotated scripts are discovered
+automatically, with no second packaging list to maintain.
+
+The build computes local class dependencies from compiled class references,
+descriptors, and literal reflection names. Put resources alongside their owning
+Java package under `src/main/resources/`; package subdirectories and root-level
+resources are included. Runtime-computed class names need an explicit class
+reference to their helper. A script must not depend on another annotated entry
+point: extract common behavior into an unannotated helper instead. Packaging
+never executes script constructors or lifecycle callbacks.
 
 Use the supported DreamBot methods for queries and interactions. GenericClient's
 `Automation`, `Banking`, and `Navigation` classes add workflow controls and complete
@@ -77,15 +124,20 @@ Journey interruptions use `Navigation.walk(journey, interruptOn, continuation)`.
 ## Verification
 
 ```bash
-./gradlew test pmdMain pmdTest pmdRouteAudit jar -PgenericClientDir=../GenericClient
+./gradlew build -PgenericClientDir=../GenericClient
+python3 tests/test_install.py
 ../GenericClient/gradlew -p ../GenericClient routeAudit scriptCatalogAudit -PscriptCatalog="$PWD"
 ```
 
 Tests simulate observable inventory, dialogue, entity, and quest transitions.
 The offline route audit uses the client's bundled collision graph, ordered via
 points, arrival alternatives, and avoided tiles. The catalog audit loads the
-packaged JAR through the client's production registry and verifies every entry
-point, input, action, and random-event binding.
+packaged JARs individually and together through the client's production registry
+and verifies every entry point, input, action, and random-event binding. Packaging
+tests additionally use a classloader containing only one JAR and the SDK, and
+check reproducible output and resource inclusion. Installer tests exercise real
+temporary directories; use `--powershell /path/to/pwsh` for PowerShell or the
+Windows executable from WSL with `--temp-root` set to a Windows-mounted directory.
 
 These checks do not establish live completion of a quest, encounter, or journey.
 A live account completed Romeo & Juliet and Goblin Diplomacy on 2026-09-05 (see

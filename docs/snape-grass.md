@@ -6,6 +6,16 @@ It has no setup inputs, purchasing policy, collection target, or automatic stop.
 It requires the native bank-side inventory and `walk.nearest` support introduced
 by GenericClient commit `1b2f688`.
 
+## Distributable
+
+Share **`build/libs/snape-grass-collector.jar`**. It contains only this selectable
+script and its required helper classes and bank-location resource. It does not
+include the other catalog scripts or require a separate shared-library JAR.
+With a compatible GenericClient installed and scripts stopped, copy it to
+`%USERPROFILE%\.runelite\genericclient\scripts` and click **Scripts → Reload list**.
+Existing combined-catalog installations must first migrate using the full
+installer described in the repository README, avoiding duplicate script IDs.
+
 ## Source and recovery
 
 The source is `C:\Users\User\Downloads\grass.jar` (3,961,997 bytes), SHA-256

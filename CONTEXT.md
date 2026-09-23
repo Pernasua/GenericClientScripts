@@ -8,6 +8,11 @@ The catalog defines account objectives in terms of observed progress and results
 
 **Catalog entry:** A named automation the operator can select and configure.
 
+**Script artifact:** One distributable `<catalog-id>.jar` containing exactly one
+catalog entry plus its transitive local helpers and package resources. The
+GenericClient SDK remains client-owned. A workflow option inside an entry, such
+as one quest in Quest Runner, is not a separate artifact.
+
 **Snapshot:** The observed account and scene state at a game tick.
 
 **Receipt:** The observed result of an input operation, distinct from the game
