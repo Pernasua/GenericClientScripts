@@ -34,6 +34,8 @@ call the MCP `script_reload` tool, or restart the client.
 
 ## Included scripts
 
+- [Snape Grass Collector](docs/snape-grass.md): the recovered Waterbirth/Castle Wars
+  workflow, preserving its original equipment deposits and withdraw-all tablets
 - AIO Prayer, Magic, Melee, Agility, and Thieving
 - Quest Runner: Witch's House, Waterfall, Tree Gnome Village, Fight Arena,
   The Grand Tree, Monkey Madness I, Romeo & Juliet, and Goblin Diplomacy
